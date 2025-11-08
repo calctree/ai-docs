@@ -1,0 +1,28 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "CalcTree API Documentation",
+  "description": "Complete GraphQL API documentation for CalcTree - engineering calculation platform with support for MathJS, Python, and multi-statement calculations with units",
+  "folders": ["."],
+  "excludeFolders": ["tests", "archive", ".claude"],
+  "excludeFiles": ["test_*.py"],
+  "rules": [
+    "CRITICAL: Always call addPageNode mutation after createPageSync or pages won't appear in the page tree (#1 most common mistake)",
+    "CRITICAL: Always include data.pageId when creating calculations or they won't be visible on any page (#2 most common mistake)",
+    "CRITICAL: Always include data.userId in all statements - fetch it using currentUser query with your API key",
+    "MathJS formulas MUST use assignment syntax 'variable_name = expression' - for literals include units (e.g., 'load = 5 kN'), for calculations units are inherited (e.g., 'moment = load * length')",
+    "Use calculationId = pageId to link calculations to pages (they are the same ID)",
+    "All IDs must be nanoid format (21 characters with alphanumeric + underscore/hyphen), NOT UUIDs",
+    "Use createOrUpdateCalculation with withStatements array for creating multi-statement calculations",
+    "All statements in a calculation share the same scope - variables can reference each other",
+    "Use revisionId: 'ffffffff' for operations even though API returns null",
+    "Only use Python libraries pre-installed in CalcTree environment (see PYTHON_GUIDE.md for complete list of 26+ libraries)",
+    "MathJS automatically handles unit arithmetic and conversions (e.g., 1 kPa * 1 m^2 = 1 kN)",
+    "Page URLs follow format: https://app.calctree.com/edit/{workspaceId}/{pageId}",
+    "Engine types: 'mathjs' (single statement), 'multiline_mathjs' (multiple statements with \\n separator), 'python' (Python code)",
+    "Querying calculations with Python statements may return authorization errors, but statements ARE created successfully - verify in UI",
+    "CRITICAL: MathJS variables with units are automatically ct.quantity() objects in Python - do NOT wrap them again",
+    "Use ct.quantity('value unit') to create new unit-aware values in Python (e.g., ct.quantity('100 kN'))",
+    "Convert units with .to('unit') method and extract numeric values with .magnitude() method",
+    "CalcTree uses pint library for units - invalid unit operations (e.g., adding time + length) will raise errors"
+  ]
+}

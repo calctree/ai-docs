@@ -1,0 +1,1391 @@
+# CalcTree GraphQL API
+
+> CalcTree is a computational platform for engineering calculations and data management.
+
+API Endpoint: https://graph.calctree.com/graphql
+
+## Authentication
+
+All API requests require authentication using an API key in the `x-api-key` header:
+
+```
+x-api-key: YOUR_API_KEY
+```
+
+Example with curl:
+```bash
+curl -X POST https://graph.calctree.com/graphql \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{"query":"{ currentUser { id email } }"}'
+```
+
+Example with Python:
+```python
+import requests
+
+headers = {
+    "Content-Type": "application/json",
+    "x-api-key": "YOUR_API_KEY"
+}
+
+response = requests.post(
+    "https://graph.calctree.com/graphql",
+    headers=headers,
+    json={"query": "{ currentUser { id email } }"}
+)
+```
+
+To obtain an API key, visit your CalcTree account settings.
+
+## API Limitations and Known Issues
+
+**IMPORTANT - READ FIRST:**
+
+1. **Page creation requires TWO steps**: After calling `createPageSync`, you MUST call `addPageNode` or the page won't appear in the page tree. This is the most common mistake.
+
+2. **Calculations MUST include `data: { pageId }`**: When creating calculations with `createCalculation`, you MUST include the `data` parameter with `pageId` to link the calculation to a page. Without this, calculations are created but won't appear on any page.
+
+3. **createCalculationWithMultipleStatementsSync** - This mutation mentioned in older docs has AUTHORIZATION issues. Use `createCalculation` + `addStatementToCalculation` instead.
+
+3. **revisionId handling**: The API returns `revisionId: null` but you must use `"ffffffff"` as the revisionId when calling `addStatementToCalculation`.
+
+4. **ID generation**: You MUST generate all IDs client-side using nanoid format. The API will not auto-generate IDs for pages, calculations, or statements.
+
+5. **putInitialPageContent**: May return DOWNSTREAM_SERVICE_ERROR. This mutation for adding markdown content to pages has reliability issues.
+
+6. **Schema field mismatches**:
+   - Page type has `parent` (object), not `parentId` (string)
+   - Page type has `deletedAt`, not `createdAt` or `updatedAt`
+   - Use `withStatement` argument, not `statement` or `input`
+
+## Core Concepts
+
+- **Workspace**: A container for pages, calculations, and data
+- **Page**: A document that can contain calculations, files, and datasets
+- **Calculation**: A collection of executable statements with formulas and variables
+- **Statement**: A single formula or variable assignment within a calculation
+- **Dataset**: Structured data (tables/columns) that can be used in calculations
+- **PageFile**: Files attached to pages (Excel, images, etc.)
+
+## Important ID Requirements
+
+**CRITICAL:** CalcTree uses nanoid format for IDs, not UUIDs.
+
+- **Page IDs**: Must be nanoid format (21 characters: alphanumeric + underscore/hyphen)
+  - Example: `gxZe018G5BDFM6fpizSgS`
+  - Generate with: `nanoid.generate()` in Python (install: `pip install nanoid`)
+
+- **Page URLs**: Use the format `https://app.calctree.com/edit/{workspaceId}/{pageId}`
+  - Example: `https://app.calctree.com/edit/98ea9cce-909a-44e9-9359-be53c3d67d04/gxZe018G5BDFM6fpizSgS`
+
+## Calculations
+
+### Create a Calculation - WORKING METHOD
+
+**TESTED AND VERIFIED:** Use `createCalculation` mutation. **CRITICAL:** Include `data: { pageId }` to link calculation to a page.
+
+```graphql
+mutation CreateCalculation($workspaceId: ID!, $calculationId: ID!, $withStatement: CreateStatementInput!, $data: JSON) {
+  createCalculation(
+    workspaceId: $workspaceId
+    calculationId: $calculationId
+    withStatement: $withStatement
+    data: $data
+  ) {
+    calculationId
+    revisionId
+  }
+}
+```
+
+**Required Variables:**
+```json
+{
+  "workspaceId": "your-workspace-id",
+  "calculationId": "nanoid-generated-id",
+  "withStatement": {
+    "statementId": "nanoid-generated-id",
+    "title": "variable_name",
+    "formula": "10 m",
+    "engine": "mathjs"
+  },
+  "data": {
+    "pageId": "page-nanoid-id"
+  }
+}
+```
+
+**CreateStatementInput Required Fields:**
+- `statementId` (ID!): nanoid format
+- `title` (String!): Display name for the statement (appears in UI sidebar)
+- `formula` (String!): The formula - **MUST include variable assignment** (see Syntax Guide below)
+- `engine` (String!): Calculation engine type (see below)
+
+**Supported Engine Types:**
+- `"mathjs"`: Single statement calculations with unit support
+  - **Syntax:** `variable_name = value units` (e.g., `beam_length = 10 m`)
+  - **NOT** just `10 m` - must include variable assignment!
+
+- `"multiline_mathjs"`: Multiple mathjs statements in one block (use `\n` for line breaks)
+  - **Syntax:** Multiple lines with assignments
+  - Example: `width = 300 mm\nheight = 500 mm\narea = width * height`
+
+- `"python"`: Python code execution
+  - **Requirements:** Include `userId` in `data` field when creating via API
+  - Variables in global scope available to other statements
+  - Use `print()` for output
+
+**CRITICAL:** Always include `data: { pageId }` to link the calculation to a page. Without this, calculations are created but not visible on any page.
+
+## Calculation Syntax & Variable Scoping
+
+### MathJS Formula Syntax Rules
+
+**IMPORTANT:** MathJS formulas MUST include variable assignment:
+
+✅ **CORRECT:**
+```javascript
+beam_length = 10 m
+width = 300 mm
+load = 5 kN
+moment = load * beam_length  // References other variables
+```
+
+❌ **WRONG:**
+```javascript
+10 m  // Missing variable assignment!
+```
+
+### Variable Scoping & Cross-References
+
+**All statements in a calculation share the same scope:**
+
+1. Variables defined in one statement can be referenced in other statements
+2. The `calculationId` determines the scope boundary
+3. Variables are evaluated in order
+4. Use `calculationId = pageId` to link calculation to page
+
+**Example - Multi-Statement Calculation:**
+
+```python
+{
+    "calculationId": page_id,  # Same ID = same scope
+    "withStatements": [
+        {
+            "title": "Inputs",
+            "engine": "multiline_mathjs",
+            "formula": "L = 10 m\nb = 300 mm\nh = 500 mm"
+        },
+        {
+            "title": "Section Properties",
+            "engine": "multiline_mathjs",
+            "formula": "A = b * h\nI = b * h^3 / 12"  # References b, h from above
+        },
+        {
+            "title": "max_stress",
+            "engine": "mathjs",
+            "formula": "max_stress = M / (I / (h/2))"  # References M, I, h
+        }
+    ]
+}
+```
+
+### Unit Handling in MathJS
+
+CalcTree automatically handles unit arithmetic:
+
+```javascript
+// Unit arithmetic
+pressure = 1 kPa
+area = 1 m^2
+force = pressure * area  // Returns: 1 kN
+
+// Unit conversion
+length_m = 3 m + 200 cm  // Returns: 5 m
+length_ft = length_m to ft  // Converts to feet
+
+// Invalid operations prevented
+invalid = 10 m + 5 kg  // ERROR: incompatible units
+```
+
+**Common Units:**
+- Length: `m`, `mm`, `cm`, `km`, `ft`, `in`
+- Force: `N`, `kN`, `MN`, `lbf`, `kip`
+- Pressure: `Pa`, `kPa`, `MPa`, `GPa`, `psi`, `ksi`
+- Area: `m^2`, `mm^2`, `ft^2`, `in^2`
+
+### Python Variable Integration
+
+Python statements can reference variables from mathjs statements in the same calculation:
+
+```python
+# MathJS statement
+beam_length = 10 m
+load = 5 kN
+
+# Python statement (same calculation)
+import numpy as np
+moment = beam_length * load  # References mathjs variables
+print(f'Moment: {moment}')
+```
+
+### Available Python Libraries
+
+CalcTree provides 26+ pre-installed Python libraries:
+
+**Core Scientific:** numpy, scipy, pandas, matplotlib, seaborn, SymPy, Scikit-learn
+
+**Engineering/Structural:** anaStruct, OpenSeesPy+OpsVis, PyNite, pyFrame3DD, pycba, sectionproperties, StructPy, pyCalculiX, eurocodepy
+
+**Specialized:** Groundhog (geotechnical), GemPy (geological), REDi (resilience), energy-py-linear
+
+**Utilities:** handcalcs, ezdxf, SimPy, pysal, joypy, topojson
+
+**CalcTree-specific functions:**
+- `ct.open('filename.csv', mode='rb')` - Open files uploaded to workspace
+- `ct.quantity()` - Create unit-aware quantities (syntax TBD - requires testing)
+
+### Complete Working Example
+
+**Page with cross-referenced calculations:**
+https://app.calctree.com/edit/98ea9cce-909a-44e9-9359-be53c3d67d04/DMiiWjtSp4Sq_TLU-GgHt
+
+This demonstrates:
+- Variable assignments with units
+- Cross-referencing between statements
+- Unit arithmetic
+- Calculated variables
+
+**Note:** `revisionId` may be null in response. This is expected behavior.
+
+### Run Calculation with Variable Inputs
+
+Execute an existing calculation with different input values without modifying the stored calculation:
+
+```graphql
+query RunCalculation {
+  simpleCalculate(
+    workspaceId: "workspace_id"
+    calculationId: "calc_id"
+    scope: [
+      { name: "length", value: 15 }
+      { name: "width", value: 8 }
+    ]
+  ) {
+    statements {
+      title
+      value
+      unit
+    }
+  }
+}
+```
+
+### Get Calculation
+
+Retrieve a specific calculation with all its statements:
+
+```graphql
+query GetCalculation {
+  calculation(
+    workspaceId: "workspace_id"
+    calculationId: "calc_id"
+    revisionId: "revision_id"
+  ) {
+    id
+    revisionId
+    statements {
+      id
+      title
+      formula
+      value
+      unit
+      error
+    }
+  }
+}
+```
+
+### Add Statement to Calculation - WORKING METHOD
+
+**TESTED AND VERIFIED:** Add statements to an existing calculation:
+
+```graphql
+mutation AddStatement($workspaceId: ID!, $calculationId: ID!, $revisionId: ID!, $withStatement: CreateStatementInput!) {
+  addStatementToCalculation(
+    workspaceId: $workspaceId
+    calculationId: $calculationId
+    revisionId: $revisionId
+    withStatement: $withStatement
+  ) {
+    calculationId
+    revisionId
+  }
+}
+```
+
+**Required Variables:**
+```json
+{
+  "workspaceId": "your-workspace-id",
+  "calculationId": "calc-id",
+  "revisionId": "ffffffff",
+  "withStatement": {
+    "statementId": "nanoid-generated-id",
+    "title": "variable_name",
+    "formula": "existing_var * 2",
+    "engine": "mathjs"
+  }
+}
+```
+
+**CRITICAL:** Use `revisionId: "ffffffff"` to add statements. The API returns `revisionId: null` but you should always use `"ffffffff"` when adding/updating statements.
+
+**Note:** The argument is `withStatement` (not `statement` or `input`).
+
+### Update Statement
+
+Modify an existing statement in a calculation:
+
+```graphql
+mutation UpdateStatement {
+  updateCalculation(
+    workspaceId: "workspace_id"
+    calculationId: "calc_id"
+    revisionId: "current_revision_id"
+    statementId: "statement_id"
+    statement: {
+      title: "updated_variable"
+      formula: "new_formula"
+      unit: "mm"
+    }
+  ) {
+    correlationId
+  }
+}
+```
+
+### Delete Statement
+
+Remove a statement from a calculation:
+
+```graphql
+mutation DeleteStatement {
+  deleteStatement(
+    workspaceId: "workspace_id"
+    calculationId: "calc_id"
+    revisionId: "current_revision_id"
+    statementId: "statement_id"
+  ) {
+    correlationId
+  }
+}
+```
+
+### Duplicate Calculation
+
+Copy a calculation to a new location:
+
+```graphql
+mutation DuplicateCalculation {
+  duplicateCalculation(
+    workspaceId: "workspace_id"
+    calculationId: "calc_id"
+    targetWorkspaceId: "target_workspace_id"
+    targetPageId: "target_page_id"
+  ) {
+    id
+    revisionId
+  }
+}
+```
+
+## Pages
+
+### Get All Pages in Workspace - CORRECTED
+
+**Note:** Page type uses `parent` (object) not `parentId`, and has `deletedAt` instead of `createdAt`/`updatedAt`.
+
+```graphql
+query GetPages($workspaceId: ID!) {
+  pages(workspaceId: $workspaceId) {
+    id
+    title
+    deletedAt
+  }
+}
+```
+
+### Get Single Page
+
+```graphql
+query GetPage($workspaceId: ID!, $id: ID!) {
+  page(workspaceId: $workspaceId, id: $id) {
+    id
+    title
+    deletedAt
+    parent {
+      id
+      title
+    }
+  }
+}
+```
+
+### Create Page - WORKING METHOD
+
+**TESTED AND VERIFIED:** Creating a page requires TWO steps:
+
+**Step 1: Create the page**
+```graphql
+mutation CreatePage($workspaceId: ID!, $input: CreatePageInput!) {
+  createPageSync(workspaceId: $workspaceId, input: $input) {
+    id
+    title
+  }
+}
+```
+
+**Step 2: Add page to the page tree** ⚠️ CRITICAL - DO NOT SKIP THIS STEP
+```graphql
+mutation AddPageNode($workspaceId: ID!, $input: AddPageNodeInput!) {
+  addPageNode(workspaceId: $workspaceId, input: $input) {
+    newPageId
+    parentId
+    correlation {
+      workspaceId
+    }
+  }
+}
+```
+
+**Complete Example:**
+```json
+// Step 1: Create page
+{
+  "workspaceId": "your-workspace-id",
+  "input": {
+    "id": "nanoid-generated-page-id",
+    "title": "Page Title",
+    "workspaceId": "your-workspace-id"
+  }
+}
+
+// Step 2: Add to tree (REQUIRED)
+{
+  "workspaceId": "your-workspace-id",
+  "input": {
+    "pageId": "nanoid-generated-page-id",
+    "parentId": "optional-parent-page-id"  // omit for root level
+  }
+}
+```
+
+**CreatePageInput Required Fields:**
+- `id` (ID!): nanoid format - you must generate and provide this
+- `title` (String!): Page title
+- `workspaceId` (ID!): Must match the workspaceId argument
+- `parentId` (String): Optional - ID of parent page for hierarchy
+- `header` (String): Optional - Page header text
+- `settings` (PageSettingsInput): Optional - Page settings
+
+**AddPageNodeInput Required Fields:**
+- `pageId` (ID!): The page ID from step 1
+- `parentId` (ID): Optional - parent page ID for hierarchy
+
+**Important:**
+1. The `id` field is REQUIRED in CreatePageInput. You must generate a nanoid before calling this mutation.
+2. You MUST call `addPageNode` after creating a page, or it won't appear in the page tree.
+3. The `addPageNodeSync` mutation will be available soon and returns results synchronously.
+
+### Update Page
+
+```graphql
+mutation UpdatePage {
+  updatePage(
+    workspaceId: "workspace_id"
+    id: "page_id"
+    page: {
+      title: "Updated Title"
+    }
+  ) {
+    id
+    title
+  }
+}
+```
+
+### Delete Page
+
+```graphql
+mutation DeletePage {
+  deletePage(
+    workspaceId: "workspace_id"
+    id: "page_id"
+  ) {
+    id
+  }
+}
+```
+
+### Duplicate Page
+
+```graphql
+mutation DuplicatePage {
+  duplicatePage(
+    workspaceId: "workspace_id"
+    pageId: "page_id"
+    targetParentId: "target_parent_id"
+  ) {
+    id
+    title
+  }
+}
+```
+
+### Duplicate Page to Another Workspace
+
+```graphql
+mutation DuplicatePageToWorkspace {
+  duplicatePageIntoWorkspace(
+    sourceWorkspaceId: "source_workspace_id"
+    targetWorkspaceId: "target_workspace_id"
+    pageId: "page_id"
+    targetParentId: "target_parent_id"
+  ) {
+    id
+    title
+  }
+}
+```
+
+### Get Page Tree Structure
+
+```graphql
+query GetPageTree {
+  pageTree(workspaceId: "workspace_id") {
+    id
+    title
+    children {
+      id
+      title
+      children {
+        id
+        title
+      }
+    }
+  }
+}
+```
+
+### Get Page Content
+
+```graphql
+query GetPageContent {
+  pageContent(
+    workspaceId: "workspace_id"
+    pageId: "page_id"
+  ) {
+    markdown
+    calculations {
+      id
+      revisionId
+    }
+  }
+}
+```
+
+## File Management
+
+### Upload File to Page
+
+1. Create presigned upload URL:
+
+```graphql
+mutation GetUploadURL {
+  createPresignedUploadPost(
+    workspaceId: "workspace_id"
+    fileName: "data.xlsx"
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  ) {
+    url
+    fields
+    key
+  }
+}
+```
+
+2. Upload file to S3 using the presigned URL (use HTTP POST with the fields from response)
+
+3. Add file reference to workspace:
+
+```graphql
+mutation AddFileToWorkspace {
+  addWorkspaceFile(
+    workspaceId: "workspace_id"
+    key: "file_key_from_step_1"
+    fileName: "data.xlsx"
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    size: 12345
+  ) {
+    id
+    fileName
+    url
+  }
+}
+```
+
+### Get Page Files
+
+```graphql
+query GetPageFiles {
+  pageFiles(
+    workspaceId: "workspace_id"
+    pageId: "page_id"
+  ) {
+    id
+    fileName
+    contentType
+    size
+    url
+    createdAt
+  }
+}
+```
+
+### Get File Details
+
+```graphql
+query GetFile {
+  pageFile(id: "file_id") {
+    id
+    fileName
+    contentType
+    size
+    url
+    pageId
+  }
+}
+```
+
+### Update File Sharing Settings
+
+```graphql
+mutation UpdateFileSharing {
+  updatePageFileSharing(
+    fileId: "file_id"
+    shared: true
+  ) {
+    id
+    shared
+  }
+}
+```
+
+## Datasets
+
+### Get Dataset
+
+```graphql
+query GetDataset {
+  dataset(id: "dataset_id") {
+    id
+    name
+    columns {
+      id
+      name
+      type
+    }
+    rows
+  }
+}
+```
+
+### Add Column to Dataset
+
+```graphql
+mutation AddColumn {
+  addDatasetColumn(
+    datasetId: "dataset_id"
+    column: {
+      name: "new_column"
+      type: "number"
+    }
+  ) {
+    id
+    columns {
+      id
+      name
+      type
+    }
+  }
+}
+```
+
+### Update Dataset Column
+
+```graphql
+mutation UpdateColumn {
+  updateDatasetColumn(
+    datasetId: "dataset_id"
+    columnId: "column_id"
+    column: {
+      name: "updated_name"
+      type: "text"
+    }
+  ) {
+    id
+    columns {
+      id
+      name
+      type
+    }
+  }
+}
+```
+
+## Workspace Management
+
+### Get Current User
+
+```graphql
+query GetCurrentUser {
+  currentUser {
+    id
+    email
+    fullName
+    workspaces {
+      id
+      name
+      role
+    }
+  }
+}
+```
+
+### Get Workspaces by User
+
+```graphql
+query GetUserWorkspaces {
+  workspacesByUserId(userId: "user_id") {
+    id
+    name
+    description
+    createdAt
+  }
+}
+```
+
+### Get Workspace
+
+```graphql
+query GetWorkspace {
+  workspace(id: "workspace_id") {
+    id
+    name
+    description
+    members {
+      userId
+      role
+      email
+    }
+  }
+}
+```
+
+## Page Parameters (Variables)
+
+Page parameters are reusable variables that can be referenced across calculations on a page.
+
+### Get Page Parameters
+
+```graphql
+query GetPageParameters {
+  pageParameters(
+    workspaceId: "workspace_id"
+    pageId: "page_id"
+  ) {
+    id
+    title
+    value
+    unit
+    description
+  }
+}
+```
+
+### Create Page Parameter
+
+```graphql
+mutation CreateParameter {
+  createPageParameterSync(
+    workspaceId: "workspace_id"
+    pageId: "page_id"
+    parameter: {
+      title: "default_length"
+      value: 100
+      unit: "mm"
+      description: "Default length for calculations"
+    }
+  ) {
+    id
+    title
+    value
+    unit
+  }
+}
+```
+
+### Update Page Parameter
+
+```graphql
+mutation UpdateParameter {
+  updatePageParameter(
+    workspaceId: "workspace_id"
+    id: "parameter_id"
+    parameter: {
+      value: 150
+      unit: "mm"
+    }
+  ) {
+    id
+    value
+    unit
+  }
+}
+```
+
+### Delete Page Parameter
+
+```graphql
+mutation DeleteParameter {
+  deletePageParameter(
+    workspaceId: "workspace_id"
+    id: "parameter_id"
+  ) {
+    id
+  }
+}
+```
+
+## Common Patterns
+
+### Create Page with Calculation - COMPLETE WORKING EXAMPLE
+
+**TESTED AND VERIFIED:** This example creates a page and adds multiple calculation statements:
+
+```python
+from nanoid import generate
+import requests
+
+WORKSPACE_ID = "your-workspace-id"
+API_KEY = "your-api-key"
+ENDPOINT = "https://graph.calctree.com/graphql"
+HEADERS = {"Content-Type": "application/json", "x-api-key": API_KEY}
+
+def execute(query, variables):
+    return requests.post(ENDPOINT, headers=HEADERS, json={"query": query, "variables": variables}).json()
+
+# Step 1: Create page
+page_id = generate()
+execute("""
+    mutation CreatePage($workspaceId: ID!, $input: CreatePageInput!) {
+      createPageSync(workspaceId: $workspaceId, input: $input) {
+        id
+        title
+      }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "input": {
+        "id": page_id,
+        "title": "Beam Analysis",
+        "workspaceId": WORKSPACE_ID
+    }
+})
+
+# Step 2: Add page to tree (CRITICAL - do not skip!)
+execute("""
+    mutation AddPageNode($workspaceId: ID!, $input: AddPageNodeInput!) {
+      addPageNode(workspaceId: $workspaceId, input: $input) {
+        newPageId
+        parentId
+      }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "input": {
+        "pageId": page_id
+    }
+})
+
+# Step 3: Create calculation with first statement (CRITICAL: include data.pageId!)
+calc_id = generate()
+execute("""
+    mutation CreateCalculation($workspaceId: ID!, $calculationId: ID!, $withStatement: CreateStatementInput!, $data: JSON) {
+      createCalculation(workspaceId: $workspaceId, calculationId: $calculationId, withStatement: $withStatement, data: $data) {
+        calculationId
+      }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "calculationId": calc_id,
+    "withStatement": {
+        "statementId": generate(),
+        "title": "load",
+        "formula": "1000 N",
+        "engine": "mathjs"
+    },
+    "data": {
+        "pageId": page_id
+    }
+})
+
+# Step 3: Add more statements (use revisionId = "ffffffff")
+execute("""
+    mutation AddStatement($workspaceId: ID!, $calculationId: ID!, $revisionId: ID!, $withStatement: CreateStatementInput!) {
+      addStatementToCalculation(workspaceId: $workspaceId, calculationId: $calculationId, revisionId: $revisionId, withStatement: $withStatement) {
+        calculationId
+      }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "calculationId": calc_id,
+    "revisionId": "ffffffff",
+    "withStatement": {
+        "statementId": generate(),
+        "title": "length",
+        "formula": "5 m",
+        "engine": "mathjs"
+    }
+})
+
+# Add calculated statement
+execute("""
+    mutation AddStatement($workspaceId: ID!, $calculationId: ID!, $revisionId: ID!, $withStatement: CreateStatementInput!) {
+      addStatementToCalculation(workspaceId: $workspaceId, calculationId: $calculationId, revisionId: $revisionId, withStatement: $withStatement) {
+        calculationId
+      }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "calculationId": calc_id,
+    "revisionId": "ffffffff",
+    "withStatement": {
+        "statementId": generate(),
+        "title": "moment",
+        "formula": "load * length",
+        "engine": "mathjs"
+    }
+})
+
+# Page URL:
+print(f"https://app.calctree.com/edit/{WORKSPACE_ID}/{page_id}")
+```
+
+### Complete Example with Multiple Engine Types (VERIFIED WORKING)
+
+```python
+from nanoid import generate
+import requests
+
+WORKSPACE_ID = "your_workspace_id"
+API_KEY = "your_api_key"
+ENDPOINT = "https://graph.calctree.com/graphql"
+HEADERS = {"Content-Type": "application/json", "x-api-key": API_KEY}
+
+def execute(query, variables):
+    return requests.post(ENDPOINT, headers=HEADERS, json={"query": query, "variables": variables}).json()
+
+# Create page
+page_id = generate()
+execute("""
+    mutation CreatePage($workspaceId: ID!, $input: CreatePageInput!) {
+      createPageSync(workspaceId: $workspaceId, input: $input) { id }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "input": {"id": page_id, "title": "Mixed Engine Types", "workspaceId": WORKSPACE_ID}
+})
+
+# Add to page tree (REQUIRED!)
+execute("""
+    mutation AddPageNode($workspaceId: ID!, $input: AddPageNodeInput!) {
+      addPageNode(workspaceId: $workspaceId, input: $input) { newPageId }
+    }
+""", {"workspaceId": WORKSPACE_ID, "input": {"pageId": page_id}})
+
+# Create calculation with multiple statements using createOrUpdateCalculation
+# This mutation works for adding multiple statements at once
+execute("""
+    mutation CreateCalc($workspaceId: ID!, $calculationId: ID!, $withStatements: [CreateStatementInput!]!, $data: JSON) {
+      createOrUpdateCalculation(
+        workspaceId: $workspaceId
+        calculationId: $calculationId
+        withStatements: $withStatements
+        data: $data
+      ) {
+        calculationId
+        revisionId
+      }
+    }
+""", {
+    "workspaceId": WORKSPACE_ID,
+    "calculationId": page_id,  # Use page_id as calculation_id
+    "withStatements": [
+        {
+            "statementId": generate(),
+            "title": "beam_length",
+            "engine": "mathjs",
+            "formula": "10 m"
+        },
+        {
+            "statementId": generate(),
+            "title": "Dimensions",
+            "engine": "multiline_mathjs",  # Multiple statements in one block
+            "formula": "width = 300 mm\nheight = 500 mm\narea = width * height"
+        },
+        {
+            "statementId": generate(),
+            "title": "load",
+            "engine": "mathjs",
+            "formula": "5 kN"
+        }
+    ],
+    "data": {
+        "pageId": page_id,
+        "id": generate(),
+        "cursor": "0",
+        "timestamp": int(time.time() * 1000)
+    }
+})
+
+print(f"https://app.calctree.com/edit/{WORKSPACE_ID}/{page_id}")
+```
+
+**Verified Working Pages:**
+- mathjs only: https://app.calctree.com/edit/98ea9cce-909a-44e9-9359-be53c3d67d04/Va5PHZflB1wtChfQ_3BR1
+- multiline_mathjs (single): https://app.calctree.com/edit/98ea9cce-909a-44e9-9359-be53c3d67d04/sk3HrHsUhduDdrq62OwPB
+- multiline_mathjs (multiple blocks): https://app.calctree.com/edit/98ea9cce-909a-44e9-9359-be53c3d67d04/dDSfQxw-WLIx0zQSOYUPw
+- python: https://app.calctree.com/edit/98ea9cce-909a-44e9-9359-be53c3d67d04/8Pv7LKZMHWRqOVwAuoeQi
+
+### Upload and Reference Dataset
+
+1. Upload file containing data (see File Management section)
+2. Reference dataset in calculation formulas
+3. Use dataset columns in statements
+
+### Duplicate Page with All Resources
+
+```graphql
+mutation DuplicateWithResources {
+  duplicatePageIntoWorkspace(
+    sourceWorkspaceId: "source_ws"
+    targetWorkspaceId: "target_ws"
+    pageId: "page_id"
+  ) {
+    id
+    title
+  }
+
+  duplicatePageResources(
+    sourceWorkspaceId: "source_ws"
+    targetWorkspaceId: "target_ws"
+    pageId: "page_id"
+  ) {
+    files {
+      id
+      fileName
+    }
+  }
+}
+```
+
+## Error Handling
+
+Errors in calculations are returned in the statement's error field:
+
+```graphql
+{
+  calculation {
+    statements {
+      title
+      value
+      error  # null if no error, string message if error occurred
+    }
+  }
+}
+```
+
+GraphQL errors follow standard format:
+```json
+{
+  "errors": [
+    {
+      "message": "Error description",
+      "path": ["field", "path"],
+      "extensions": {
+        "code": "ERROR_CODE"
+      }
+    }
+  ]
+}
+```
+
+## Best Practices
+
+1. **ALWAYS call addPageNode after creating a page**: After `createPageSync`, immediately call `addPageNode` to add the page to the tree. This is the #1 most common mistake. Pages won't appear in the UI without this step.
+
+2. **ALWAYS include `data: { pageId }` when creating calculations**: This is the #2 most common mistake. Without this parameter, calculations are created but won't appear on any page.
+
+3. **Use nanoid for IDs**: All IDs (page, calculation, statement) must use nanoid format (21 chars). Install: `pip install nanoid`
+
+4. **Use revisionId "ffffffff"**: Always use `revisionId: "ffffffff"` when adding/updating statements, even though the API returns `null`
+
+5. **Required fields for statements**:
+   - `statementId`: nanoid (you must generate)
+   - `title`: Variable name (string)
+   - `formula`: The formula string (e.g., "10 m" or "load * length")
+   - `engine`: Engine type - **VERIFIED WORKING**: `"mathjs"` (single statements), `"multiline_mathjs"` (multiple statements with `\n` line breaks), and `"python"` (Python code). **Note:** Python requires `userId` in `data` field.
+
+5. **Page creation requires ID**: You must generate and provide the page ID in `CreatePageInput.id` - the API will not auto-generate it
+
+6. **Correct mutation names**:
+   - Use `createCalculation` (not `createCalculationWithMultipleStatementsSync`)
+   - Use `addStatementToCalculation` (not `addStatement` or `addStatementSync`)
+   - Use `addPageNode` after creating a page
+   - Argument is `withStatement` (not `statement` or `input`)
+
+7. **Page URLs**: Format is `https://app.calctree.com/edit/{workspaceId}/{pageId}` (not `/workspace/{workspaceId}/page/{pageId}`)
+
+8. **Handle errors**: Check both GraphQL errors and statement-level errors in responses
+
+9. **Workspace isolation**: All operations are workspace-scoped for data security
+
+## Subscription Support
+
+For real-time updates on calculation execution (when using async mutations), subscribe to the sync endpoint:
+
+```graphql
+subscription WatchCalculations {
+  sync(workspaceId: "workspace_id") {
+    edges {
+      node {
+        type
+        calculationId
+        revisionId
+        data
+      }
+    }
+  }
+}
+```
+
+## Rate Limits
+
+Contact CalcTree for information about rate limits and usage quotas for your API key.
+
+## Support
+
+- Documentation: https://docs.calctree.com
+- API Issues: support@calctree.com
+- GraphQL Playground: https://graph.calctree.com/graphql (interactive API explorer)
+
+---
+
+# CalcTree MDX Math Block Generation
+
+## Overview
+
+CalcTree supports embedding calculations directly in markdown documents using MDX EquationBlock components. This section provides instructions for generating properly formatted CalcTree MDX syntax.
+
+## Critical Format Rules
+
+- Output markdown/MDX formatted text only
+- Use blank lines between all content blocks
+- NO backticks, indentation, or code block formatting around EquationBlocks
+- Write EquationBlock as raw MDX directly in the markdown
+
+## EquationBlock Syntax
+
+```
+<EquationBlock name="BlockName" formula='statement1\nstatement2\nstatement3' />
+```
+
+### Key Requirements
+
+1. **Blank lines** before and after each EquationBlock (mandatory)
+2. Use `\n` to separate statements within formula attribute
+3. Use single quotes (') for formula attribute if it contains double quotes
+4. **NO comments on same line** - All explanations/comments must be in plain text BEFORE the EquationBlock, never inline with variables/functions
+
+## Variable Rules
+
+- Define variables before use in formulas
+- No apostrophes in variable names (use underscores: `f_c` not `f'c`)
+- String values need double quotes within the formula
+- Use mathjs syntax for mathematical operations
+- **UNITS**: Only put units on INPUT variables. Calculated values will have units computed automatically by the engine
+
+## Function Definition Support
+
+You can define and use custom functions within EquationBlock:
+
+```
+<EquationBlock name="Functions" formula='f(x) = x^3\nc = f(3)\ng(a,b) = a * b + 2\nresult = g(5, 10)' />
+```
+
+Functions are defined with standard mathematical notation and can be called with parameters.
+
+## Document Structure Order
+
+### 1. Inputs - All Input Variables WITH UNITS
+
+```
+<EquationBlock name="Inputs" formula='P = 50 kN\nL = 6 m\nE = 200000 MPa' />
+```
+
+### 2. Calculations - Intermediate Calculations
+
+NO UNITS on calculated values - they are automatically computed from inputs:
+
+```
+<EquationBlock name="Calculations" formula='M_max = P * L / 4\ndelta = P * L^3 / (48 * E * I)' />
+```
+
+### 3. Checks - Results and Conditional Checks
+
+```
+<EquationBlock name="Checks" formula='Check = Actual <= Allowable ? "OK" : "NG"' />
+```
+
+## Comments and Descriptions
+
+**CORRECT** - Comment before block:
+```
+This calculates the maximum moment for a simply supported beam:
+
+<EquationBlock name="Moment" formula='M_max = w * L^2 / 8' />
+```
+
+**INCORRECT** - Never inline comments:
+```
+<EquationBlock name="Moment" formula='M_max = w * L^2 / 8  # maximum moment' />
+```
+
+All explanatory text must be in markdown above or below the EquationBlock, never inside the formula attribute.
+
+## Conditional Logic
+
+Use ternary operators for checks and conditional values:
+
+```
+result = condition ? "OK" : "NG"
+utilization_ratio = demand / capacity
+status = utilization_ratio <= 1.0 ? "PASS" : "FAIL"
+```
+
+## Mathematical Operations
+
+CalcTree uses mathjs syntax. Common operations:
+
+- Addition: `a + b`
+- Subtraction: `a - b`
+- Multiplication: `a * b`
+- Division: `a / b`
+- Exponentiation: `a^b` or `pow(a, b)`
+- Square root: `sqrt(x)`
+- Absolute value: `abs(x)`
+- Min/max: `min(a, b, c)`, `max(a, b, c)`
+- Trigonometry: `sin(x)`, `cos(x)`, `tan(x)`
+
+## String Comparisons
+
+Use `equalText()` function for string comparisons:
+
+```
+result = equalText(material, "Steel") ? steel_value : concrete_value
+```
+
+## Example with Functions and Multiple Conditions
+
+```
+Define load factors based on member type:
+
+<EquationBlock name="LoadFactors" formula='phi(type) = equalText(type, "Beam") ? 0.8 : equalText(type, "Column") ? 0.6 : 0.7\nmember_type = "Beam"\nfactor = phi(member_type)' />
+```
+
+## Complete Example: Beam Deflection Check
+
+```
+Calculate beam deflection with safety check:
+
+<EquationBlock name="Inputs" formula='P = 50 kN\nL = 6 m\nE = 200000 MPa\nI = 300e6 mm^4\nallowable_deflection = 25 mm' />
+
+Define deflection calculation function:
+
+<EquationBlock name="Functions" formula='deflection(P, L, E, I) = (P * 1000 * (L * 1000)^3) / (48 * E * I)\ndelta_max = deflection(P, L, E, I)' />
+
+Check if deflection is within limits:
+
+<EquationBlock name="Checks" formula='deflection_check = delta_max <= allowable_deflection ? "OK" : "NG"' />
+```
+
+## Complete Example: Concrete Column Design
+
+```
+# Concrete Column Design to AS3600
+
+## Design Parameters
+
+<EquationBlock name="Inputs" formula='N_star = 1500 kN\nf_c = 32 MPa\nD = 400 mm\nB = 400 mm\ncover = 40 mm' />
+
+## Concrete Properties
+
+Define concrete strength reduction factors:
+
+<EquationBlock name="Properties" formula='alpha_1 = 0.85 - 0.0015 * f_c\nalpha_1_final = alpha_1 >= 0.67 ? alpha_1 : 0.67\nalpha_2 = 0.85 - 0.0025 * f_c\nalpha_2_final = alpha_2 >= 0.67 ? alpha_2 : 0.67' />
+
+## Section Capacity
+
+Calculate gross cross-sectional area and capacity:
+
+<EquationBlock name="Capacity" formula='A_g = B * D\nphi = 0.6\nN_uo = 0.85 * f_c * A_g\nphi_N_uo = phi * N_uo' />
+
+## Design Check
+
+<EquationBlock name="Check" formula='utilization = N_star / phi_N_uo\nstatus = utilization <= 1.0 ? "PASS" : "FAIL"' />
+
+The column has a utilization ratio shown above and the design check status is displayed.
+```
+
+## Best Practices for MDX Generation
+
+1. **Always use blank lines** around EquationBlocks
+2. **Group related calculations** in the same EquationBlock
+3. **Use descriptive names** for EquationBlock components (e.g., "Inputs", "BeamCapacity", "SafetyChecks")
+4. **Define inputs first**, then calculations, then checks
+5. **Only specify units on inputs** - let CalcTree compute output units
+6. **Use functions for reusable logic** rather than repeating formulas
+7. **Add markdown descriptions** above blocks to explain what they calculate
+8. **Use ternary operators** for conditional logic and checks
+9. **Avoid inline comments** - all documentation should be in markdown, not in formulas
+
+## Integration with Page Content Mutation
+
+When creating page content via the API, embed EquationBlocks in the markdown:
+
+```graphql
+mutation UpdatePageContent {
+  putInitialPageContent(
+    workspaceId: "workspace_id"
+    pageId: "page_id"
+    content: {
+      markdown: "# My Calculation\n\n<EquationBlock name='Inputs' formula='x = 5\\ny = 10\\nresult = x * y' />\n\nThe result shows the product."
+    }
+  )
+}
+```
+
+Note: In GraphQL strings, backslashes must be escaped (`\\n` instead of `\n`).
