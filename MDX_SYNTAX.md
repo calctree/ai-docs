@@ -8,13 +8,56 @@ CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown
 
 ---
 
-## Critical Format Rules
+## Critical Rules for AI Agents Generating MDX
 
-- Output markdown/MDX formatted text only
-- Use blank lines between all content blocks
-- **NO backticks, indentation, or code block formatting around MDX components**
-- Write MDX components as raw MDX directly in the markdown
-- All explanatory text must be in markdown, never inside formula attributes
+When generating CalcTree page content, follow these formatting rules:
+
+### Output Format Rules
+
+1. **Output raw MDX/markdown only** - No code blocks, no backticks around MDX components
+2. **Use blank lines** before and after ALL MDX components (mandatory)
+3. **Write components directly** - Don't wrap them in code fences or indent them
+4. **No inline comments** - All explanations must be in markdown text, never inside `formula` attributes
+
+### Correct vs Incorrect
+
+**✅ CORRECT - Raw MDX with blank lines:**
+```
+Calculate the maximum moment:
+
+<EquationBlock name="Moment" formula='M_max = w * L^2 / 8' />
+
+The moment value shows the peak bending moment.
+```
+
+**❌ INCORRECT - Wrapped in code block:**
+````
+```
+<EquationBlock name="Moment" formula='M_max = w * L^2 / 8' />
+```
+````
+
+**❌ INCORRECT - No blank lines:**
+```
+Calculate the maximum moment:
+<EquationBlock name="Moment" formula='M_max = w * L^2 / 8' />
+The moment value shows the peak bending moment.
+```
+
+**❌ INCORRECT - Inline comment:**
+```
+<EquationBlock name="Moment" formula='M_max = w * L^2 / 8  # maximum moment' />
+```
+
+### General MDX Component Rules
+
+These rules apply to **all** CalcTree calculation components (EquationBlock, SelectInput, RadioInput, SimpleInput, MatrixBlock):
+
+1. **Blank lines are mandatory** before and after every component
+2. **No code fence wrapping** - write components as raw MDX in the markdown
+3. **Comments go outside** - use markdown text above/below, never inside formula
+4. **Use descriptive names** - `name="BeamCapacity"` not `name="calc1"`
+5. **Group logically** - inputs first, calculations second, checks third
 
 ---
 
