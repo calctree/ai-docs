@@ -78,6 +78,7 @@ print(f"https://app.calctree.com/edit/{WORKSPACE_ID}/{page_id}")
 - **[API_REFERENCE.md](API_REFERENCE.md)** - Complete GraphQL schema, mutations, queries, and required fields
 - **[CALCULATION_GUIDE.md](CALCULATION_GUIDE.md)** - Formula syntax, variable scoping, units, and engine types
 - **[PYTHON_GUIDE.md](PYTHON_GUIDE.md)** - Pre-installed libraries (26+ packages) and Python-specific examples
+- **[MDX_SYNTAX.md](MDX_SYNTAX.md)** - Page content syntax with MDX components and markdown elements
 - **[EXAMPLES.md](EXAMPLES.md)** - Copy-paste ready code examples
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common mistakes and solutions
 
