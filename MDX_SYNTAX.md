@@ -12,12 +12,48 @@ CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown
 
 When generating CalcTree page content, follow these formatting rules:
 
+### ⚠️ MOST CRITICAL RULE: Blank Lines Around Components
+
+**EVERY MDX component (EquationBlock, SelectInput, RadioInput, SimpleInput, MatrixBlock) MUST be:**
+- Preceded by a blank line (double newline `\n\n`)
+- Followed by a blank line (double newline `\n\n`)
+- Written on its own line, never inline with text
+- Written as raw MDX, NEVER wrapped in code blocks (\`\`\`)
+
+This is the #1 most common mistake. Always ensure proper spacing.
+
+**Visual spacing guide:**
+```
+[Text content]
+[BLANK LINE] ← Required!
+<EquationBlock ... />
+[BLANK LINE] ← Required!
+[More text content]
+```
+
 ### Output Format Rules
 
-1. **Output raw MDX/markdown only** - No code blocks, no backticks around MDX components
-2. **Use blank lines** before and after ALL MDX components (mandatory)
-3. **Write components directly** - Don't wrap them in code fences or indent them
-4. **No inline comments** - All explanations must be in markdown text, never inside `formula` attributes
+1. **CRITICAL: Always respond with markdown/MDX formatted text** - No code blocks, no backticks around MDX components
+2. **CRITICAL: Responses must be well formatted, ensuring new lines `\n\n` are used between content blocks**
+3. **CRITICAL: When asked to write in markdown, do NOT start with \`\`\`markdown**
+4. **CRITICAL: DO NOT use block formatting. Only use inline formatting**
+5. **CRITICAL: Every MDX element (EquationBlock, Assignment) MUST be completely surrounded by blank lines. No exceptions.**
+6. **NEVER write <Block> or <Selection>**
+7. **Write components directly** - Don't wrap them in code fences or indent them
+8. **No inline comments** - All explanations must be in markdown text, never inside `formula` attributes
+
+### Presenting MDX Output to Users
+
+When generating MDX content for users to paste into CalcTree:
+
+1. **Always provide the MDX in a markdown code block** (using \`\`\`markdown) to make it easy to copy
+2. **Always remind the user to paste with stripped formatting** using **Ctrl+Shift+V** (or Cmd+Shift+V on Mac) when pasting into CalcTree
+3. This ensures the MDX is pasted as plain text without any formatting artifacts
+
+**Example user instruction:**
+```
+Copy the MDX below and paste it into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V on Mac) to paste without formatting.
+```
 
 ### Correct vs Incorrect
 
@@ -53,11 +89,13 @@ The moment value shows the peak bending moment.
 
 These rules apply to **all** CalcTree calculation components (EquationBlock, SelectInput, RadioInput, SimpleInput, MatrixBlock):
 
-1. **Blank lines are mandatory** before and after every component
-2. **No code fence wrapping** - write components as raw MDX in the markdown
-3. **Comments go outside** - use markdown text above/below, never inside formula
-4. **Use descriptive names** - `name="BeamCapacity"` not `name="calc1"`
-5. **Group logically** - inputs first, calculations second, checks third
+1. **CRITICAL: Blank lines are mandatory** before and after every component - no exceptions
+2. **CRITICAL: No code fence wrapping** - write components as raw MDX in the markdown, never wrapped in \`\`\`
+3. **CRITICAL: Components must be on their own line** - never on the same line as any text
+4. **Comments go outside** - use markdown text above/below, never inside formula
+5. **Use descriptive names** - `name="BeamCapacity"` not `name="calc1"`
+6. **Group logically** - inputs first, calculations second, checks third
+7. **Newlines between content blocks** - always use `\n\n` (double newline) between different sections of content
 
 ---
 
@@ -73,13 +111,21 @@ The primary component for engineering calculations. Also known as "math block".
 ```
 
 **Key Requirements:**
-1. **Blank lines** before and after each EquationBlock (mandatory)
-2. Use `\n` to separate statements within formula attribute
-3. Use single quotes (') for formula attribute if it contains double quotes
-4. **NO comments on same line** - All explanations/comments must be in plain text BEFORE the EquationBlock
+1. **CRITICAL: ALWAYS place an empty line (blank line) before and after each EquationBlock**
+2. **CRITICAL: NEVER use backticks (\`\`\`), indentation, or code block formatting for EquationBlock. Write EquationBlock as raw MDX directly in your response.**
+3. **CRITICAL: EquationBlock MUST start on a new line and end with a new line. Do NOT put EquationBlock on the same line as any text.**
+4. **CRITICAL: NO COMMENTS or DESCRIPTION should be included within EquationBlock formulas. All explanations must be in plain text BEFORE the EquationBlock.**
+5. **CRITICAL: In EquationBlock formula attributes, use \n (HTML entity for newline) to separate lines. Do NOT use backslashes or actual newlines.**
+6. Each mathjs statement must be separated by `\n` with no other characters between them
+7. Use single quotes (') for formula attribute if it contains double quotes
+8. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
 
-**Example:**
+**Correct Format Example:**
 ```
+Check maximum reinforcement ratio:
+
+<EquationBlock name="StressBlock" formula='a = As * fsy / (gamma * fc * b)\nku_actual = a / d' />
+
 Calculate beam properties:
 
 <EquationBlock name="Inputs" formula='P = 50 kN\nL = 6 m\nE = 200000 MPa' />
@@ -88,6 +134,13 @@ Intermediate calculations:
 
 <EquationBlock name="Calculations" formula='M_max = P * L / 4\ndelta = P * L^3 / (48 * E * I)' />
 ```
+
+**Incorrect Format (DO NOT DO THIS):**
+```
+Check maximum reinforcement ratio:
+<EquationBlock name="StressBlock" formula='a = As * fsy / (gamma * fc * b)\nku_actual = a / d' />
+```
+Note the missing blank line before the EquationBlock - this is WRONG.
 
 **Complex Multi-Line Example:**
 ```
@@ -530,16 +583,18 @@ All explanatory text must be in markdown above or below the EquationBlock, never
 
 ## Best Practices Summary
 
-1. **Always use blank lines** around MDX components
-2. **Group related calculations** in the same EquationBlock
-3. **Use descriptive names** for components (e.g., "Inputs", "BeamCapacity", "SafetyChecks")
-4. **Define inputs first**, then calculations, then checks
-5. **Only specify units on inputs** - let CalcTree compute output units
-6. **Use functions for reusable logic** rather than repeating formulas
-7. **Add markdown descriptions** above blocks to explain what they calculate
-8. **Use ternary operators** for conditional logic and checks
-9. **Avoid inline comments** - all documentation should be in markdown, not in formulas
-10. **Use `&#10;` for newlines** in double-quoted attributes, or use `\n` with single quotes
+1. **CRITICAL: Always use blank lines (double newlines `\n\n`)** around ALL MDX components - no exceptions
+2. **CRITICAL: Never wrap MDX components in code blocks** - write them as raw MDX
+3. **CRITICAL: Components must stand alone on their own lines** - never inline with text
+4. **Group related calculations** in the same EquationBlock using `\n` to separate statements
+5. **Use descriptive names** for components (e.g., "Inputs", "BeamCapacity", "SafetyChecks")
+6. **Define inputs first**, then calculations, then checks
+7. **Only specify units on inputs** - let CalcTree compute output units
+8. **Use functions for reusable logic** rather than repeating formulas
+9. **Add markdown descriptions** above blocks to explain what they calculate
+10. **Use ternary operators** for conditional logic and checks
+11. **Avoid inline comments** - all documentation should be in markdown, not in formulas
+12. **Use `\n` for newlines** in formula attributes (with single quotes), or `&#10;` with double quotes
 
 ---
 
