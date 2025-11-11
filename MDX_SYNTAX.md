@@ -38,9 +38,10 @@ This is the #1 most common mistake. Always ensure proper spacing.
 3. **CRITICAL: When asked to write in markdown, do NOT start with \`\`\`markdown**
 4. **CRITICAL: DO NOT use block formatting. Only use inline formatting**
 5. **CRITICAL: Every MDX element (EquationBlock, Assignment) MUST be completely surrounded by blank lines. No exceptions.**
-6. **NEVER write <Block> or <Selection>**
-7. **Write components directly** - Don't wrap them in code fences or indent them
-8. **No inline comments** - All explanations must be in markdown text, never inside `formula` attributes
+6. **CRITICAL: NEVER use JSX expression syntax with curly braces like `formula={...}` or template literals with backticks. Always use string attributes: `formula="..."` or `formula='...'`**
+7. **NEVER write <Block> or <Selection>**
+8. **Write components directly** - Don't wrap them in code fences or indent them
+9. **No inline comments** - All explanations must be in markdown text, never inside `formula` attributes
 
 ### Presenting MDX Output to Users
 
@@ -116,9 +117,10 @@ The primary component for engineering calculations. Also known as "math block".
 3. **CRITICAL: EquationBlock MUST start on a new line and end with a new line. Do NOT put EquationBlock on the same line as any text.**
 4. **CRITICAL: NO COMMENTS or DESCRIPTION should be included within EquationBlock formulas. All explanations must be in plain text BEFORE the EquationBlock.**
 5. **CRITICAL: In EquationBlock formula attributes, use \n (HTML entity for newline) to separate lines. Do NOT use backslashes or actual newlines.**
-6. Each mathjs statement must be separated by `\n` with no other characters between them
-7. Use single quotes (') for formula attribute if it contains double quotes
-8. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
+6. **CRITICAL: NEVER use JSX expression syntax `formula={...}` or template literals. Always use string attributes: `formula="..."` or `formula='...'`**
+7. Each mathjs statement must be separated by `\n` with no other characters between them
+8. Use single quotes (') for formula attribute if it contains double quotes
+9. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
 
 **Correct Format Example:**
 ```
@@ -135,12 +137,22 @@ Intermediate calculations:
 <EquationBlock name="Calculations" formula='M_max = P * L / 4\ndelta = P * L^3 / (48 * E * I)' />
 ```
 
-**Incorrect Format (DO NOT DO THIS):**
+**Incorrect Format Examples (DO NOT DO THIS):**
+
+Missing blank line:
 ```
 Check maximum reinforcement ratio:
 <EquationBlock name="StressBlock" formula='a = As * fsy / (gamma * fc * b)\nku_actual = a / d' />
 ```
-Note the missing blank line before the EquationBlock - this is WRONG.
+
+Using JSX expression syntax with curly braces and template literals:
+```
+<EquationBlock name="Inputs" formula={`L = 3.2 m
+W = 1.5 m
+t = 12 mm`} />
+```
+
+Both examples above are WRONG. Never use `{}` or template literals - always use quoted strings with `\n` for newlines.
 
 **Complex Multi-Line Example:**
 ```
