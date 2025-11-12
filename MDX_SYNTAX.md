@@ -12,11 +12,13 @@ CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown
 
 ### 1. Output Format
 
-**How to present MDX depends on the context:**
+**CRITICAL: How to present MDX depends on the context:**
 
 **If responding in a chat interface (ChatGPT, Claude chat, etc.):**
-- Wrap the MDX in a markdown code fence (````markdown ... ````) to make it easy to copy
+- **ALWAYS wrap the ENTIRE MDX output in a markdown code fence** (````markdown ... ````)
+- This is REQUIRED for chat interfaces - do not skip this step
 - Include the paste instruction before the code block
+- The code block makes it easy for users to copy the content
 
 **Example for chat interfaces:**
 
@@ -451,6 +453,8 @@ See [API_REFERENCE.md](API_REFERENCE.md) for complete API documentation.
 
 Before finalizing generated MDX, verify:
 
+- [ ] **If in chat interface (ChatGPT, Claude): ENTIRE output is wrapped in ````markdown ... ```` code fence**
+- [ ] **If in coding tool (Claude Code): Output is raw MDX without code fence wrapper**
 - [ ] All components have blank lines before AND after
 - [ ] Formula attributes use string syntax (`formula='...'`), never JSX expressions (`formula={...}`)
 - [ ] First statement in formula appears on same line as opening quote (no leading newline)
