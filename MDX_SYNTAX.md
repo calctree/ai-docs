@@ -4,19 +4,34 @@ Complete reference for writing CalcTree page content with MDX components and mar
 
 ---
 
-## CRITICAL: For ChatGPT and Chat Interfaces
+## CRITICAL INSTRUCTIONS FOR CHATGPT
 
-**IF YOU ARE CHATGPT OR A CHAT-BASED AI:**
+**READ THIS FIRST - THIS IS MANDATORY:**
 
-You MUST wrap your ENTIRE MDX output in a markdown code fence like this:
+When you generate MDX content for CalcTree in a chat interface, your response MUST follow this exact format:
 
-````markdown
-# Your content here
+1. First line: Paste instruction
+2. Second line: Opening code fence ````markdown`
+3. The actual MDX content (components, markdown, etc.)
+4. Last line: Closing code fence ````
 
-<EquationBlock name="Inputs" formula='x = 5' />
-````
+**YOUR COMPLETE RESPONSE STRUCTURE:**
+```
+Copy the code below and paste into CalcTree using Ctrl+Shift+V (Cmd+Shift+V on Mac).
 
-**DO NOT output raw MDX without the code fence wrapper when in a chat interface.**
+```markdown
+# Calculation Title
+
+<EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
+
+<EquationBlock name="Results" formula='area = x * y' />
+```
+```
+
+**CRITICAL RULES:**
+- The ONLY calculation component is `<EquationBlock>` - NOT `<MathBlock>`, NOT `<Assignment>`
+- Use `formula='...'` as a STRING attribute - NOT `statements={...}` with JSX
+- DO NOT output raw MDX without the code fence wrapper
 
 ---
 
