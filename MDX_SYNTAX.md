@@ -392,17 +392,21 @@ def calculate_moment(load, length):
 
 ### LaTeX Math
 
-**Block equations:**
+**IMPORTANT: LaTeX is for STATIC equations only. For interactive calculations, use EquationBlock.**
+
+**Block equations (centered, non-interactive):**
 ```
 $$
 \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
 $$
 ```
 
-**Inline equations:**
+**Inline equations (non-interactive):**
 ```
 The formula $E = mc^2$ shows energy equivalence.
 ```
+
+**Note:** Use `$ ... $` for inline math, NOT `\( ... \)`. LaTeX equations are display-only and do not compute values. For interactive calculations that update when inputs change, always use `<EquationBlock>`.
 
 ### Columns
 
