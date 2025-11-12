@@ -370,10 +370,46 @@ _**bold and italic**_
 ```
 
 ### Code Blocks
+
+**For Python code blocks:**
+
 ````
 ```python
-def calculate_moment(load, length):
-    return load * length / 4
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Variables from EquationBlocks are automatically available
+# DO NOT redefine them - they are already in scope
+
+x = np.linspace(0, L, 100)  # L is already defined in an EquationBlock
+y = w * x  # w is already defined
+
+plt.plot(x, y)
+plt.show()
+```
+````
+
+**CRITICAL: Python Variable Scope**
+- All variables defined in EquationBlocks are automatically available in Python code blocks
+- **NEVER redefine variables** that exist in EquationBlocks (e.g., `L`, `w`, `E`, `I`)
+- Python blocks share the same scope as EquationBlocks
+- If inputs change in EquationBlocks, Python code automatically uses the new values
+- Only define NEW variables that don't exist in EquationBlocks
+
+**WRONG - Redefining existing variables:**
+````
+```python
+L = 6.0  # WRONG - L is already defined in an EquationBlock
+w = 8e3  # WRONG - w is already defined
+```
+````
+
+**CORRECT - Using existing variables:**
+````
+```python
+# L and w are already defined in EquationBlocks above
+x = np.linspace(0, L, 100)
+y = w * x
 ```
 ````
 
@@ -535,11 +571,13 @@ Before finalizing generated MDX, verify:
 - [ ] All components have blank lines before AND after
 - [ ] Formula attributes use string syntax (`formula='...'`), never JSX expressions (`formula={...}`)
 - [ ] First statement in formula appears on same line as opening quote (no leading newline)
+- [ ] Formula attributes use ACTUAL newlines to separate statements, NOT `\n` escape sequences
 - [ ] No inline comments within formula attributes
 - [ ] Units specified on inputs only, not on calculated variables
 - [ ] Variable names use underscores, not apostrophes
 - [ ] `decimal` attribute uses JSX expression syntax: `decimal={2}`, not `decimal="2"`
 - [ ] Components are not wrapped in code blocks (in the actual MDX content)
+- [ ] **Python code blocks DO NOT redefine variables from EquationBlocks - they use them directly**
 - [ ] User instructions include: "Paste with Ctrl+Shift+V (Cmd+Shift+V on Mac)"
 
 ---
