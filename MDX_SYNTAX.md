@@ -12,36 +12,49 @@ CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown
 
 ### 1. Output Format
 
-**How to present MDX to users:**
+**How to present MDX depends on the context:**
 
-When generating MDX content, format your response like this:
+**If responding in a chat interface (ChatGPT, Claude chat, etc.):**
+- Wrap the MDX in a markdown code fence (````markdown ... ````) to make it easy to copy
+- Include the paste instruction before the code block
 
-```
+**Example for chat interfaces:**
+
+---
+
 Copy the code below and paste into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V on Mac) to paste without formatting.
 
-```markdown
+````markdown
 # Your Calculation Title
-
-Descriptive text here.
 
 <EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
 
-More descriptive text.
+<EquationBlock name="Results" formula='area = x * y' />
+````
+
+---
+
+**If responding in a coding tool (Claude Code, Cursor, etc.):**
+- Provide the raw MDX directly without wrapping in code fences
+- The user can copy it directly from the response
+
+**Example for coding tools:**
+
+---
+
+Copy the text below and paste into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V on Mac) to paste without formatting.
+
+# Your Calculation Title
+
+<EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
 
 <EquationBlock name="Results" formula='area = x * y' />
-```
-```
 
-**Key points:**
-- Wrap the entire MDX content in a markdown code block (````markdown ... ````)
-- Include the paste instruction BEFORE the code block
-- The actual MDX inside the code block should NOT have ````markdown at the start
-- Individual components inside are NOT wrapped in additional code blocks
+---
 
-**What NOT to do:**
-- Never wrap individual MDX components in code blocks within the actual content
-- Never use `\`\`\`markdown` at the start of the actual MDX content itself (only as the wrapper)
-- Never use block-level formatting for components
+**Key rule for BOTH contexts:**
+- Individual MDX components are NEVER wrapped in code blocks within the actual content
+- The entire content (if using a code fence) is wrapped once, not each component separately
 
 ### 2. Blank Lines Around Components
 
