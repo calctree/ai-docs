@@ -442,7 +442,23 @@ $$
 The formula $E = mc^2$ shows energy equivalence.
 ```
 
-**Note:** Use `$ ... $` for inline math, NOT `\( ... \)`. LaTeX equations are display-only and do not compute values. For interactive calculations that update when inputs change, always use `<EquationBlock>`.
+**CRITICAL LaTeX Syntax Rules:**
+- **Inline math:** Use `$...$` NOT `\(...\)`
+- **Block math:** Use `$$...$$` NOT `\[...\]`
+- LaTeX is display-only and does NOT compute values
+- For interactive calculations, always use `<EquationBlock>`
+
+**WRONG - Using \( \) or \[ \]:**
+```
+\( R_A = \dfrac{wL}{2} \)  // WRONG
+\[ M = \frac{wL^2}{8} \]   // WRONG
+```
+
+**CORRECT - Using $ and $$:**
+```
+$R_A = \dfrac{wL}{2}$ at supports
+$$M = \frac{wL^2}{8}$$
+```
 
 ### Columns
 
