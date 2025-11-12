@@ -112,40 +112,38 @@ This is the #1 most common mistake.
 
 ### 3. Formula Attribute Syntax
 
-**Two supported patterns for `formula` attributes:**
+**CRITICAL: Use `\n` escape sequences to separate statements**
 
-**Pattern 1: Single-line with `\n` escape sequences** (recommended)
+The formula attribute MUST use `\n` (backslash-n) to separate multiple statements:
+
 ```
 <EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m\nt = 12 mm' />
 ```
 
-**Pattern 2: Multi-line with actual newlines**
-```
-<EquationBlock name="Inputs" formula='L = 5 m
-B = 2 m
-t = 12 mm
-' />
-```
-
-**CRITICAL rules for both patterns:**
-- The first statement MUST appear on the SAME line as `formula='` (no newline after the opening quote)
+**CRITICAL rules:**
+- Use `\n` (the two-character sequence backslash-n) to separate statements
+- Each statement must be separated by `\n` with no other characters between them
+- The formula attribute is a single-line string
 - NEVER use JSX expression syntax: `formula={...}` or template literals with backticks
 - NEVER use inline comments within formulas
 - Always use string attributes: `formula="..."` or `formula='...'`
 
-**WRONG - Creates blank line at top:**
+**WRONG - Using actual newlines:**
+```
+<EquationBlock name="Inputs" formula='L = 5 m
+B = 2 m
+t = 12 mm' />
+```
+
+**WRONG - Newline after opening quote:**
 ```
 <EquationBlock name="Inputs" formula='
-L = 5 m
-B = 2 m
-' />
+L = 5 m\nB = 2 m' />
 ```
 
 **CORRECT:**
 ```
-<EquationBlock name="Inputs" formula='L = 5 m
-B = 2 m
-' />
+<EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m\nt = 12 mm' />
 ```
 
 ### 4. Chaining & Scope
