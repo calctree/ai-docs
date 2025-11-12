@@ -13,12 +13,34 @@ CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown
 ### 1. Output Format
 
 **How to present MDX to users:**
-- When generating MDX for users, **wrap it in a markdown code block** (````markdown ... ````) to make it easy to copy
-- **Always include this instruction:** "Copy the code below and paste into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V on Mac) to paste without formatting."
+
+When generating MDX content, format your response like this:
+
+```
+Copy the code below and paste into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V on Mac) to paste without formatting.
+
+```markdown
+# Your Calculation Title
+
+Descriptive text here.
+
+<EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
+
+More descriptive text.
+
+<EquationBlock name="Results" formula='area = x * y' />
+```
+```
+
+**Key points:**
+- Wrap the entire MDX content in a markdown code block (````markdown ... ````)
+- Include the paste instruction BEFORE the code block
+- The actual MDX inside the code block should NOT have ````markdown at the start
+- Individual components inside are NOT wrapped in additional code blocks
 
 **What NOT to do:**
-- Never wrap individual MDX components in code blocks in the actual content
-- Never use `\`\`\`markdown` at the start of the actual MDX content itself
+- Never wrap individual MDX components in code blocks within the actual content
+- Never use `\`\`\`markdown` at the start of the actual MDX content itself (only as the wrapper)
 - Never use block-level formatting for components
 
 ### 2. Blank Lines Around Components
