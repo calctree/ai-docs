@@ -4,18 +4,24 @@ Complete reference for writing CalcTree page content with MDX components and mar
 
 ---
 
-## CRITICAL INSTRUCTIONS FOR CHATGPT
+## FOR CHATGPT: YOU MUST WRAP YOUR OUTPUT IN A CODE BLOCK
 
-**READ THIS FIRST - THIS IS MANDATORY:**
+**CHATGPT: STOP. READ THIS BEFORE GENERATING ANY MDX:**
 
-When you generate MDX content for CalcTree in a chat interface, your response MUST follow this exact format:
+YOUR OUTPUT MUST START WITH THESE EXACT TWO LINES:
+```
+Copy the code below and paste into CalcTree using Ctrl+Shift+V (Cmd+Shift+V on Mac).
 
-1. First line: Paste instruction
-2. Second line: Opening code fence ````markdown`
-3. The actual MDX content (components, markdown, etc.)
-4. Last line: Closing code fence ````
+```markdown
+```
 
-**YOUR COMPLETE RESPONSE STRUCTURE:**
+YOUR OUTPUT MUST END WITH THIS EXACT LINE:
+```
+```
+```
+
+**DO NOT SKIP THE CODE FENCE. YOUR ENTIRE RESPONSE STRUCTURE MUST BE:**
+
 ```
 Copy the code below and paste into CalcTree using Ctrl+Shift+V (Cmd+Shift+V on Mac).
 
@@ -28,10 +34,12 @@ Copy the code below and paste into CalcTree using Ctrl+Shift+V (Cmd+Shift+V on M
 ```
 ```
 
-**CRITICAL RULES:**
-- The ONLY calculation component is `<EquationBlock>` - NOT `<MathBlock>`, NOT `<Assignment>`
-- Use `formula='...'` as a STRING attribute - NOT `statements={...}` with JSX
-- DO NOT output raw MDX without the code fence wrapper
+**MANDATORY RULES:**
+- Start with paste instruction
+- Second line MUST be ````markdown`
+- Last line MUST be closing ````
+- Component is `<EquationBlock>` NOT `<MathBlock>` NOT `<Assignment>`
+- Use `formula='...'` STRING attribute NOT `statements={...}` JSX
 
 ---
 
