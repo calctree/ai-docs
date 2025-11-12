@@ -2,6 +2,24 @@
 
 Complete reference for writing CalcTree page content with MDX components and markdown.
 
+---
+
+## CRITICAL: For ChatGPT and Chat Interfaces
+
+**IF YOU ARE CHATGPT OR A CHAT-BASED AI:**
+
+You MUST wrap your ENTIRE MDX output in a markdown code fence like this:
+
+````markdown
+# Your content here
+
+<EquationBlock name="Inputs" formula='x = 5' />
+````
+
+**DO NOT output raw MDX without the code fence wrapper when in a chat interface.**
+
+---
+
 ## Overview
 
 CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown with custom calculation components. The markdown engine is based on PlateJS for standard elements, with CalcTree-specific components for calculations and inputs.
@@ -9,6 +27,8 @@ CalcTree uses MDX (Markdown + JSX) for page content, combining standard markdown
 ---
 
 ## Critical Rules for AI Agents
+
+**⚠️ IMPORTANT: The ONLY calculation component is `<EquationBlock>`. There is NO `<Assignment>` component. All calculations must use `<EquationBlock>`.**
 
 ### 1. Output Format
 
