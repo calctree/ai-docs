@@ -115,15 +115,16 @@ The primary component for engineering calculations. Also known as "math block".
 1. **CRITICAL: ALWAYS place an empty line (blank line) before and after each EquationBlock**
 2. **CRITICAL: NEVER use backticks (\`\`\`), indentation, or code block formatting for EquationBlock. Write EquationBlock as raw MDX directly in your response.**
 3. **CRITICAL: EquationBlock MUST start on a new line and end with a new line. Do NOT put EquationBlock on the same line as any text.**
-4. **CRITICAL: The formula attribute content MUST start immediately after the opening quote - NO newline/linebreak after `formula='`**
-5. **CRITICAL: NO COMMENTS or DESCRIPTION should be included within EquationBlock formulas. All explanations must be in plain text BEFORE the EquationBlock.**
-6. **CRITICAL: In EquationBlock formula attributes, you can use EITHER format:**
+4. **CRITICAL: The first line of formula content MUST appear on the SAME line as `formula='` - NEVER put a newline/linebreak immediately after the opening quote**
+5. **CRITICAL: The first statement must be on the same line as the opening quote. DO NOT start with a blank line.**
+6. **CRITICAL: NO COMMENTS or DESCRIPTION should be included within EquationBlock formulas. All explanations must be in plain text BEFORE the EquationBlock.**
+7. **CRITICAL: In EquationBlock formula attributes, you can use EITHER format:**
    - **Single-line with `\n` escape sequences:** `formula='L = 5 m\nB = 2 m'`
-   - **Multi-line with actual newlines, BUT content must start immediately after opening quote:** `formula='L = 5 m` (newline) `B = 2 m` (newline) `'`
-7. **CRITICAL: NEVER use JSX expression syntax `formula={...}` or template literals. Always use string attributes: `formula="..."` or `formula='...'`**
-8. Each mathjs statement must be on its own line (separated by `\n` or actual newlines)
-9. Use single quotes (') for formula attribute if it contains double quotes
-10. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
+   - **Multi-line with actual newlines, BUT first statement must be on same line as opening quote:** `formula='L = 5 m` (newline) `B = 2 m` (newline) `'`
+8. **CRITICAL: NEVER use JSX expression syntax `formula={...}` or template literals. Always use string attributes: `formula="..."` or `formula='...'`**
+9. Each mathjs statement must be on its own line (separated by `\n` or actual newlines)
+10. Use single quotes (') for formula attribute if it contains double quotes
+11. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
 
 **Correct Format Example:**
 ```
@@ -167,7 +168,7 @@ L = 3 m
 />
 ```
 
-Formula starting with a newline character after the opening quote (WRONG - creates blank line at top):
+**WRONG - Formula starting with a newline after the opening quote (creates blank line at top):**
 ```
 <EquationBlock name="Inputs" formula='
 L = 5 m
@@ -175,19 +176,36 @@ B = 2 m
 '/>
 ```
 
+**WRONG - Another example with newline after opening quote:**
+```
+<EquationBlock name="Derived + Checks" formula='
+A = L * W
+V = A * t
+self_weight = rho * V
+' />
+```
+
 **CORRECT - Option 1 (single-line with \n escape sequences):**
 ```
 <EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m' />
 ```
 
-**CORRECT - Option 2 (multi-line but content starts immediately after opening quote):**
+**CORRECT - Option 2 (multi-line but first statement on same line as opening quote):**
 ```
 <EquationBlock name="Inputs" formula='L = 5 m
 B = 2 m
 '/>
 ```
 
-**Key difference:** In the correct multi-line format, `L = 5 m` is on the SAME line as `formula='`, NOT on the next line. This prevents the unwanted blank line at the top of the math block.
+**CORRECT - Multi-line example with multiple statements:**
+```
+<EquationBlock name="Derived + Checks" formula='A = L * W
+V = A * t
+self_weight = rho * V
+' />
+```
+
+**Key rule:** The first statement (`L = 5 m` or `A = L * W`) MUST be on the SAME line as `formula='`, NOT on the next line. This prevents the unwanted blank line at the top of the math block.
 
 **Complex Multi-Line Example:**
 ```
