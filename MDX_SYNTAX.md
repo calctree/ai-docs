@@ -115,12 +115,13 @@ The primary component for engineering calculations. Also known as "math block".
 1. **CRITICAL: ALWAYS place an empty line (blank line) before and after each EquationBlock**
 2. **CRITICAL: NEVER use backticks (\`\`\`), indentation, or code block formatting for EquationBlock. Write EquationBlock as raw MDX directly in your response.**
 3. **CRITICAL: EquationBlock MUST start on a new line and end with a new line. Do NOT put EquationBlock on the same line as any text.**
-4. **CRITICAL: NO COMMENTS or DESCRIPTION should be included within EquationBlock formulas. All explanations must be in plain text BEFORE the EquationBlock.**
-5. **CRITICAL: In EquationBlock formula attributes, use \n (HTML entity for newline) to separate lines. Do NOT use backslashes or actual newlines.**
-6. **CRITICAL: NEVER use JSX expression syntax `formula={...}` or template literals. Always use string attributes: `formula="..."` or `formula='...'`**
-7. Each mathjs statement must be separated by `\n` with no other characters between them
-8. Use single quotes (') for formula attribute if it contains double quotes
-9. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
+4. **CRITICAL: The formula attribute MUST be a single-line string. NEVER split the formula content across multiple lines with actual newlines.**
+5. **CRITICAL: NO COMMENTS or DESCRIPTION should be included within EquationBlock formulas. All explanations must be in plain text BEFORE the EquationBlock.**
+6. **CRITICAL: In EquationBlock formula attributes, use \n (escape sequence) to separate statements. Do NOT use actual newlines, backslashes, or line breaks within the attribute value.**
+7. **CRITICAL: NEVER use JSX expression syntax `formula={...}` or template literals. Always use string attributes: `formula="..."` or `formula='...'`**
+8. Each mathjs statement must be separated by `\n` with no other characters between them
+9. Use single quotes (') for formula attribute if it contains double quotes
+10. If there is a double quote (") in your formula in EquationBlock, USE single quotes (') to wrap the entire formula attribute
 
 **Correct Format Example:**
 ```
@@ -152,7 +153,22 @@ W = 1.5 m
 t = 12 mm`} />
 ```
 
-Both examples above are WRONG. Never use `{}` or template literals - always use quoted strings with `\n` for newlines.
+Multi-line formula attribute with actual newlines (creates unwanted blank line at top):
+```
+<EquationBlock
+  name="Inputs"
+  formula='
+b = 250 mm
+h = 450 mm
+L = 3 m
+'
+/>
+```
+
+All examples above are WRONG. The formula attribute MUST be a single-line string using `\n` escape sequences:
+```
+<EquationBlock name="Inputs" formula='b = 250 mm\nh = 450 mm\nL = 3 m' />
+```
 
 **Complex Multi-Line Example:**
 ```
