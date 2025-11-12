@@ -28,7 +28,8 @@ Copy the code below and paste into CalcTree using Ctrl+Shift+V (Cmd+Shift+V on M
 ```markdown
 # Calculation Title
 
-<EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
+<EquationBlock name="Inputs" formula='x = 5 m
+y = 10 m' />
 
 <EquationBlock name="Results" formula='area = x * y' />
 ```
@@ -72,7 +73,8 @@ Copy the code below and paste into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V 
 ````markdown
 # Your Calculation Title
 
-<EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
+<EquationBlock name="Inputs" formula='x = 5 m
+y = 10 m' />
 
 <EquationBlock name="Results" formula='area = x * y' />
 ````
@@ -91,7 +93,8 @@ Copy the text below and paste into CalcTree using **Ctrl+Shift+V** (Cmd+Shift+V 
 
 # Your Calculation Title
 
-<EquationBlock name="Inputs" formula='x = 5 m\ny = 10 m' />
+<EquationBlock name="Inputs" formula='x = 5 m
+y = 10 m' />
 
 <EquationBlock name="Results" formula='area = x * y' />
 
@@ -120,38 +123,42 @@ This is the #1 most common mistake.
 
 ### 3. Formula Attribute Syntax
 
-**CRITICAL: Use `\n` escape sequences to separate statements**
+**CRITICAL: Use ACTUAL newlines to separate statements**
 
-The formula attribute MUST use `\n` (backslash-n) to separate multiple statements:
+The formula attribute MUST use actual newline characters (NOT `\n` escape sequences):
 
-```
-<EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m\nt = 12 mm' />
-```
-
-**CRITICAL rules:**
-- Use `\n` (the two-character sequence backslash-n) to separate statements
-- Each statement must be separated by `\n` with no other characters between them
-- The formula attribute is a single-line string
-- NEVER use JSX expression syntax: `formula={...}` or template literals with backticks
-- NEVER use inline comments within formulas
-- Always use string attributes: `formula="..."` or `formula='...'`
-
-**WRONG - Using actual newlines:**
 ```
 <EquationBlock name="Inputs" formula='L = 5 m
 B = 2 m
 t = 12 mm' />
 ```
 
+**CRITICAL rules:**
+- Use ACTUAL newlines (press Enter) to separate statements
+- The first statement MUST start on the SAME line as `formula='` (no newline after the opening quote)
+- The closing quote `'` should be on its own line after the last statement
+- NEVER use `\n` escape sequences - use real newlines
+- NEVER use JSX expression syntax: `formula={...}` or template literals with backticks
+- NEVER use inline comments within formulas
+- Always use string attributes: `formula="..."` or `formula='...'`
+
+**WRONG - Using \n escape sequences:**
+```
+<EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m\nt = 12 mm' />
+```
+
 **WRONG - Newline after opening quote:**
 ```
 <EquationBlock name="Inputs" formula='
-L = 5 m\nB = 2 m' />
+L = 5 m
+B = 2 m' />
 ```
 
 **CORRECT:**
 ```
-<EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m\nt = 12 mm' />
+<EquationBlock name="Inputs" formula='L = 5 m
+B = 2 m
+t = 12 mm' />
 ```
 
 ### 4. Chaining & Scope
@@ -159,9 +166,11 @@ L = 5 m\nB = 2 m' />
 **All EquationBlocks in a page share the same calculation scope.** Variables defined in one block are automatically available in later blocks.
 
 ```
-<EquationBlock name="Inputs" formula='L = 5 m\nB = 2 m' />
+<EquationBlock name="Inputs" formula='L = 5 m
+B = 2 m' />
 
-<EquationBlock name="Results" formula='A = L * B\nP = 2 * (L + B)' />
+<EquationBlock name="Results" formula='A = L * B
+P = 2 * (L + B)' />
 ```
 
 Variables `L` and `B` from the first block are used in the second block without re-declaring.
@@ -174,9 +183,11 @@ Variables `L` and `B` from the first block are used in the second block without 
 
 **Example:**
 ```
-<EquationBlock name="Inputs" formula='P = 50 kN\nL = 6 m' />
+<EquationBlock name="Inputs" formula='P = 50 kN
+L = 6 m' />
 
-<EquationBlock name="Calculations" formula='M_max = P * L / 4\nM_kNm = M_max to kN*m' />
+<EquationBlock name="Calculations" formula='M_max = P * L / 4
+M_kNm = M_max to kN*m' />
 ```
 
 ### 6. JSX Expressions vs String Attributes
@@ -216,27 +227,34 @@ The primary component for engineering calculations.
 
 **Syntax:**
 ```
-<EquationBlock name="BlockName" formula='statement1\nstatement2\nstatement3' />
+<EquationBlock name="BlockName" formula='statement1
+statement2
+statement3' />
 ```
 
 **Attributes:**
 - `name` - Descriptive name for the block (e.g., "Inputs", "BeamCapacity", "Checks")
-- `formula` - String containing mathjs statements separated by `\n` or actual newlines
+- `formula` - String containing mathjs statements separated by actual newlines
 
 **Example:**
 ```
 Calculate beam properties:
 
-<EquationBlock name="Inputs" formula='P = 50 kN\nL = 6 m\nE = 200000 MPa\nI = 300e6 mm^4' />
+<EquationBlock name="Inputs" formula='P = 50 kN
+L = 6 m
+E = 200000 MPa
+I = 300e6 mm^4' />
 
 Determine maximum moment and deflection:
 
-<EquationBlock name="Results" formula='M_max = P * L / 4\ndelta_max = (P * L^3) / (48 * E * I)' />
+<EquationBlock name="Results" formula='M_max = P * L / 4
+delta_max = (P * L^3) / (48 * E * I)' />
 ```
 
 **Conditional checks:**
 ```
-<EquationBlock name="Checks" formula='utilization = demand / capacity\nstatus = utilization <= 1.0 ? "PASS" : "FAIL"' />
+<EquationBlock name="Checks" formula='utilization = demand / capacity
+status = utilization <= 1.0 ? "PASS" : "FAIL"' />
 ```
 
 ### SelectInput
@@ -418,21 +436,28 @@ Organize calculations in three sections:
 ```
 ## Design Parameters
 
-<EquationBlock name="Inputs" formula='N_star = 1500 kN\nf_c = 32 MPa\nD = 400 mm\nB = 400 mm' />
+<EquationBlock name="Inputs" formula='N_star = 1500 kN
+f_c = 32 MPa
+D = 400 mm
+B = 400 mm' />
 ```
 
 ### 2. Calculations
 ```
 ## Section Capacity
 
-<EquationBlock name="Capacity" formula='A_g = B * D\nphi = 0.6\nN_uo = 0.85 * f_c * A_g\nphi_N_uo = phi * N_uo' />
+<EquationBlock name="Capacity" formula='A_g = B * D
+phi = 0.6
+N_uo = 0.85 * f_c * A_g
+phi_N_uo = phi * N_uo' />
 ```
 
 ### 3. Checks
 ```
 ## Design Check
 
-<EquationBlock name="Check" formula='utilization = N_star / phi_N_uo\nstatus = utilization <= 1.0 ? "PASS" : "FAIL"' />
+<EquationBlock name="Check" formula='utilization = N_star / phi_N_uo
+status = utilization <= 1.0 ? "PASS" : "FAIL"' />
 ```
 
 ---
@@ -444,17 +469,24 @@ Organize calculations in three sections:
 
 ## Design Parameters
 
-<EquationBlock name="Inputs" formula='N_star = 1500 kN\nf_c = 32 MPa\nD = 400 mm\nB = 400 mm' />
+<EquationBlock name="Inputs" formula='N_star = 1500 kN
+f_c = 32 MPa
+D = 400 mm
+B = 400 mm' />
 
 ## Section Capacity
 
 Calculate gross area and capacity:
 
-<EquationBlock name="Capacity" formula='A_g = B * D\nphi = 0.6\nN_uo = 0.85 * f_c * A_g\nphi_N_uo = phi * N_uo' />
+<EquationBlock name="Capacity" formula='A_g = B * D
+phi = 0.6
+N_uo = 0.85 * f_c * A_g
+phi_N_uo = phi * N_uo' />
 
 ## Design Check
 
-<EquationBlock name="Check" formula='utilization = N_star / phi_N_uo\nstatus = utilization <= 1.0 ? "PASS" : "FAIL"' />
+<EquationBlock name="Check" formula='utilization = N_star / phi_N_uo
+status = utilization <= 1.0 ? "PASS" : "FAIL"' />
 
 The column utilization is shown above.
 ```
