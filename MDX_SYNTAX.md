@@ -161,7 +161,31 @@ B = 2 m
 t = 12 mm' />
 ```
 
-### 4. Chaining & Scope
+### 4. Variable Definition Order (CRITICAL)
+
+**Within a single EquationBlock, variables MUST be defined BEFORE they are used.** The math engine evaluates statements top-to-bottom, so any variable referenced must already be defined on a previous line (or in a previous EquationBlock).
+
+**WRONG - Using variables before defining them:**
+```
+<EquationBlock name="SineFunction" formula='y = A * sin(omega * t + phi)
+A = 1
+omega = 1
+phi = 0 rad' />
+```
+This will FAIL because `A`, `omega`, and `phi` are used in the first line but not defined until later.
+
+**CORRECT - Define variables before using them:**
+```
+<EquationBlock name="SineFunction" formula='A = 1
+omega = 1
+phi = 0 rad
+T = 2 * pi / omega
+f = 1 / T
+y = A * sin(omega * t + phi)' />
+```
+Now all variables are defined before they're used in the final expression.
+
+### 5. Chaining & Scope
 
 **All EquationBlocks in a page share the same calculation scope.** Variables defined in one block are automatically available in later blocks.
 
@@ -175,7 +199,7 @@ P = 2 * (L + B)' />
 
 Variables `L` and `B` from the first block are used in the second block without re-declaring.
 
-### 5. Units: Inputs Only
+### 6. Units: Inputs Only
 
 - **INPUT variables:** Always include units (e.g., `P = 50 kN`)
 - **CALCULATED variables:** Never include units - they're computed automatically (e.g., `M_max = P * L / 4`)
@@ -190,7 +214,7 @@ L = 6 m' />
 M_kNm = M_max to kN*m' />
 ```
 
-### 6. JSX Expressions vs String Attributes
+### 7. JSX Expressions vs String Attributes
 
 **Important distinction:**
 - `formula` attribute: **Always a string** (`formula="..."` or `formula='...'`) - NEVER use `{}`
@@ -201,7 +225,7 @@ M_kNm = M_max to kN*m' />
 <SimpleInput name="teamSize" format="general" decimal={0} description="Team Size" formula="teamSize=5" />
 ```
 
-### 7. No Comments Inside Formulas
+### 8. No Comments Inside Formulas
 
 All explanatory text must be in markdown above or below components, never inside `formula` attributes.
 
@@ -588,6 +612,7 @@ Before finalizing generated MDX, verify:
 - [ ] Formula attributes use string syntax (`formula='...'`), never JSX expressions (`formula={...}`)
 - [ ] First statement in formula appears on same line as opening quote (no leading newline)
 - [ ] Formula attributes use ACTUAL newlines to separate statements, NOT `\n` escape sequences
+- [ ] **Within each EquationBlock, variables are defined BEFORE they are used** (top-to-bottom evaluation)
 - [ ] No inline comments within formula attributes
 - [ ] Units specified on inputs only, not on calculated variables
 - [ ] Variable names use underscores, not apostrophes
