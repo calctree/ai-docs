@@ -593,8 +593,8 @@ moment_Nm = moment.to("N*m")  # Convert to N*m
 deflection_mm = deflection.to("mm")  # Convert to mm
 
 # Extract numeric values
-moment_value = moment_Nm.magnitude()
-deflection_value = deflection_mm.magnitude()
+moment_value = moment_Nm.magnitude
+deflection_value = deflection_mm.magnitude
 
 # Create new quantities for limits
 max_moment = ct.quantity("100 kN*m")
@@ -637,7 +637,7 @@ print(f"Page URL: https://app.calctree.com/edit/{WORKSPACE_ID}/{page_id}")
 1. MathJS variables (`beam_length`, `load`, etc.) automatically become `ct.quantity()` objects in Python
 2. Unit arithmetic happens automatically - just use normal operators
 3. Use `.to("unit")` to convert units
-4. Use `.magnitude()` to extract numeric values
+4. Use `.magnitude` to extract numeric values
 5. DO NOT wrap MathJS variables with `ct.quantity()` - they already have units
 
 ---

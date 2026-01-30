@@ -197,7 +197,7 @@ pressure_kPa = pressure.to("kPa")
 
 **Extract numeric value (without unit):**
 ```python
-value = pressure_kPa.magnitude()
+value = pressure_kPa.magnitude
 ```
 
 ### Working with MathJS Variables (CRITICAL)
@@ -216,7 +216,7 @@ area = width * height  # Unit math happens automatically
 area_m2 = area.to("m^2")
 
 # Get just the number
-numeric_value = area_m2.magnitude()
+numeric_value = area_m2.magnitude
 ```
 
 **Do NOT re-wrap page parameters:**
@@ -243,7 +243,7 @@ moment = load * beam_length  # Returns: 50 kN*m
 moment_Nm = moment.to("N*m")  # Returns: 50000 N*m
 
 # Extract numeric value
-moment_value = moment_Nm.magnitude()  # Returns: 50000.0
+moment_value = moment_Nm.magnitude  # Returns: 50000.0
 
 # Create new quantities
 max_stress = ct.quantity("250 MPa")
@@ -289,7 +289,7 @@ else:
     print(f"✗ FAIL: Deflection {deflection_mm} > {limit}")
 
 # Extract value for further calculations
-deflection_value = deflection_mm.magnitude()
+deflection_value = deflection_mm.magnitude
 ```
 
 ### CalcTree Unit Functions Reference
@@ -299,7 +299,7 @@ deflection_value = deflection_mm.magnitude()
 | `ct.quantity("value unit")` | Create unit-aware value | `ct.quantity("100 kN")` |
 | `ct.units("unit")` | Create unit with magnitude 1.0 | `ct.units("MPa")` |
 | `.to("unit")` | Convert to different unit | `pressure.to("kPa")` |
-| `.magnitude()` | Extract numeric value | `value.magnitude()` |
+| `.magnitude` | Extract numeric value | `value.magnitude` |
 
 ### Important Notes
 

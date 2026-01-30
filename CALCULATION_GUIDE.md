@@ -217,7 +217,7 @@ moment = beam_length * load  # Returns: 50 kN*m (unit math automatic)
 moment_Nm = moment.to("N*m")  # Returns: 50000 N*m
 
 # Extract numeric value
-value = moment_Nm.magnitude()  # Returns: 50000.0
+value = moment_Nm.magnitude  # Returns: 50000.0
 
 print(f'Moment: {moment}')
 print(f'Moment in N*m: {moment_Nm}')
