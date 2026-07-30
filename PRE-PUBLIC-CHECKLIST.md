@@ -1,0 +1,59 @@
+# Before this repo goes public again
+
+The repo was made private on 2026-07-30 pending this cleanup. It was previously public and
+Context7-indexed. Nothing below blocks internal use: the workarounds are documented in
+`SKILL.md` and we keep building against them.
+
+## Blocker 1: `x-api-key` silently drops formula statements
+
+**Fix server-side. Do not ship this as permanent public guidance.**
+
+Under `Authorization: Bearer <jwt>`, a content write creates the body node and the
+calculation statement together. Under `x-api-key`, the body node lands, the calculation
+service rejects the forwarded key, and the statement never persists. The caller gets a 200
+and a page that looks correct with empty calculation blocks. No error surfaces.
+
+Why it matters for a public repo: an API key is the credential we would hand to an external
+integrator, and it is the one that produces silently broken pages. Publishing "use Bearer,
+never the API key" tells the world that our documented authentication path does not work for
+the main write. The honest fix is for the calculation service to accept the forwarded API
+key, or for the gateway to exchange it for a service token before forwarding.
+
+- **Workaround, in effect now:** `SKILL.md` section 1 says to use Bearer and explains that
+  the key does not carry through. Internal flows already mint a Bearer token.
+- **Exit condition:** an API key write creates the statement, verified by a live test, and
+  `SKILL.md` section 1 is rewritten to present the API key as the normal path.
+- **Owner:** platform / tech team. Needs a ticket.
+
+## Blocker 2: ID format guidance contradicts working practice
+
+`API_REFERENCE.md` line 65 says "**CRITICAL:** CalcTree uses nanoid format for all IDs, NOT
+UUIDs". Platform-generated ids are indeed 21-character nanoids, but the harness has been
+creating pages with `crypto.randomUUID()` and they work. One of those is wrong, or the truth
+is "client-minted ids of either shape are accepted", which is what we currently believe.
+Settle it with a live test before either claim is published.
+
+## Blocker 3: stale content
+
+Every doc here predates 2026-02 and none has been re-verified: `API_REFERENCE.md` (726 lines,
+2025-11-08), `EXAMPLES.md` (904), `TROUBLESHOOTING.md` (437), `CALCULATION_GUIDE.md` (447),
+`calctree_reference.py` (276), and `tests/` (45 exploration scripts, all 2025-11-08, no
+runner). These get deleted or archived and replaced by `SKILL.md` plus the published harness
+primitives. Publishing them as they stand is worse than publishing nothing, because the
+quick start teaches Blocker 1.
+
+Open question: `MDX_SYNTAX.md` (634) and `PYTHON_GUIDE.md` (408) are reference material that
+`SKILL.md` does not replace. Keep and re-verify, or ditch.
+
+## Blocker 4: repo identity
+
+Rename to the convention for a published AI skillset, `calctree-skills` laid out as
+`skills/calctree/SKILL.md`, plus `llms.txt` at the root. GitHub redirects the old URL, but
+Context7 indexes by project name, so the rename and the Context7 re-point happen together.
+
+## Not a blocker, but decide before publishing
+
+Publishing the harness primitives publishes the shape of the write path: that a page must be
+registered in the page tree or it is orphaned, that evaluation is async so reads need to
+settle, that MDX round-trips prose but not calculation blocks. All fine to publish, all
+better fixed than documented, and none of it stops the repo going out.
