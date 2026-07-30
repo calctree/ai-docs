@@ -61,8 +61,10 @@ runner). These get deleted or archived and replaced by `SKILL.md` plus the publi
 primitives. Publishing them as they stand is worse than publishing nothing, because the
 quick start teaches Blocker 1.
 
-Open question: `MDX_SYNTAX.md` (634) and `PYTHON_GUIDE.md` (408) are reference material that
-`SKILL.md` does not replace. Keep and re-verify, or ditch.
+Resolved 2026-07-30: `MDX_SYNTAX.md` and `PYTHON_GUIDE.md` were deleted. What was still true
+was merged into the skill, verified against the engine and the converters rather than copied:
+the `ct` surface, the pre-wrapped quantity trap, `.magnitude` being a property, the
+`plot_prefix` default, the library list, and the component vocabulary actually in use.
 
 ## Blocker 5: repo identity
 
