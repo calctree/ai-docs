@@ -9,11 +9,12 @@ blocks; the blocks form a **calculation graph** that evaluates server-side with 
 ## Layout
 
 ```
-skills/calctree/SKILL.md      the skill: read this first
-primitives/                   working code
-  calctree-api.ts             pages, MDX content, calculations, page references
-  auth.ts                     Bearer token minting
+skills/building-calctree-calculations/
+  SKILL.md                    the skill: read this first
+  scripts/calctree-api.ts     pages, MDX content, calculations, page references
+  scripts/auth.ts             Bearer token minting
   examples/                   end-to-end example
+evals/                        three evaluation scenarios
 llms.txt                      machine-readable index
 ```
 
@@ -22,7 +23,7 @@ llms.txt                      machine-readable index
 ```bash
 export CALCTREE_LOGIN_EMAIL=you@example.com
 export CALCTREE_LOGIN_PASSWORD=...
-npx tsx primitives/examples/smoke-two-page.ts <workspaceId>
+npx tsx skills/building-calctree-calculations/examples/smoke-two-page.ts <workspaceId>
 ```
 
 Three things that catch everyone out, all covered in the skill:

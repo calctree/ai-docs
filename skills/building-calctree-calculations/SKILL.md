@@ -1,5 +1,5 @@
 ---
-name: calctree
+name: building-calctree-calculations
 description: Build and read CalcTree calculation pages programmatically via the GraphQL API. Use when creating engineering calculations, inserting MDX content with live formulas, reading computed values back, or linking pages together. Covers auth, the write path, MathJS and Python statements, and the rules that silently break pages.
 ---
 
@@ -10,6 +10,25 @@ blocks; the blocks form a **calculation graph** that evaluates server-side, with
 This skill is how an AI agent drives it from outside the platform.
 
 Everything here is verified working against the live API. Treat it as settled.
+
+## Bundled code
+
+The primitives implement everything below. Prefer running them over re-writing the calls.
+
+- `scripts/calctree-api.ts` — page creation with tree registration, MDX insert, calculation
+  writes, page-context reads, cross-page references. **Read as reference** when you need the
+  exact GraphQL shape; **import and call** when driving.
+- `scripts/auth.ts` — `ensureBearer()`. Requires `CALCTREE_LOGIN_EMAIL` and
+  `CALCTREE_LOGIN_PASSWORD`, or a pre-set `CALCTREE_BEARER`.
+- `examples/smoke-two-page.ts` — **run this first** to confirm your credentials and endpoint
+  work end to end. It creates two linked pages, reads the computed values back, and prints the
+  page URLs:
+
+  ```bash
+  npx tsx examples/smoke-two-page.ts <workspaceId>
+  ```
+
+Requires `tsx` (or any TypeScript-aware runner). No other dependencies.
 
 ## 1. Auth: use Bearer, not an API key
 

@@ -7,11 +7,15 @@
     ".": "./calctree-api.ts",
     "./auth": "./auth.ts"
   },
-  "files": ["calctree-api.ts", "auth.ts", "examples"],
+  "files": [
+    "calctree-api.ts",
+    "auth.ts",
+    "examples"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/calctree/calctree-skills.git",
-    "directory": "primitives"
+    "directory": "skills/building-calctree-calculations/scripts"
   },
   "license": "UNLICENSED",
   "peerDependencies": {

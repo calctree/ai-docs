@@ -7,13 +7,13 @@ calculation pages, and it supersedes any older CalcTree API documentation.
 
 ## Start here
 
-- [CalcTree skill](skills/calctree/SKILL.md): auth, the write path, MDX calculation syntax, formula rules, and the authoring rules that decide whether a generated page reads correctly.
+- [CalcTree skill](skills/building-calctree-calculations/SKILL.md): auth, the write path, MDX calculation syntax, formula rules, and the authoring rules that decide whether a generated page reads correctly.
 
 ## Working code
 
-- [Primitives](primitives/calctree-api.ts): page creation with tree registration, MDX content insert, calculation writes, page context reads, cross-page references.
-- [Auth](primitives/auth.ts): minting a Bearer token.
-- [End-to-end example](primitives/examples/smoke-two-page.ts): creates two linked pages and reads the computed values back.
+- [Primitives](skills/building-calctree-calculations/scripts/calctree-api.ts): page creation with tree registration, MDX content insert, calculation writes, page context reads, cross-page references.
+- [Auth](skills/building-calctree-calculations/scripts/auth.ts): minting a Bearer token.
+- [End-to-end example](skills/building-calctree-calculations/examples/smoke-two-page.ts): creates two linked pages and reads the computed values back.
 
 ## Notes
 
