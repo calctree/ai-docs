@@ -2,15 +2,22 @@
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "CalcTree Skill",
   "description": "How to drive CalcTree programmatically: create and read engineering calculation pages via the GraphQL API, with MathJS and Python statements and real unit handling",
-  "folders": ["skills", "primitives", "reference"],
-  "excludeFolders": ["archive", ".claude"],
+  "folders": [
+    "skills",
+    "primitives",
+    "reference"
+  ],
+  "excludeFolders": [
+    "archive",
+    ".claude"
+  ],
   "rules": [
     "Read skills/calctree/SKILL.md first: it is verified against the live API and supersedes any older CalcTree documentation",
     "Use 'Authorization: Bearer <jwt>' for content writes, NOT x-api-key: under x-api-key the body node is created but the calculation statement is rejected, so the page looks correct and does not compute, with no error",
     "Creating a page takes two steps: create it, then register it in the page tree. A page that exists but is not in the tree is orphaned and invisible",
     "The calculation id equals the page id. Include the page id when creating a calculation or it will not be visible on any page",
     "Include the user id on statements: fetch it with the currentUser query",
-    "Use revisionId 'ffffffffff' (ten f characters) for latest-revision operations. Earlier documentation said eight; the working value is ten",
+    "Revision ids are KSUIDs. The platform's latest-revision sentinel is '~', which sorts above every base62 character (calculations REVISION_INFINITE). Hex-looking values such as 'ffffffff' appear in older documentation and in some internal callers, but they are ad-hoc and fragile: a KSUID beginning with a letter after f sorts above them. Not yet re-tested through the public API",
     "Client-minted ids are accepted. Platform-generated ids are 21-character nanoids. Earlier documentation claimed UUIDs are rejected, which is not what working practice shows",
     "Evaluation is asynchronous: settle about two seconds after a write before reading, or a read can return zero statements",
     "Verify calculations by reading the page context (statements with namedValues and errors), never by reading the page back as MDX: MDX round-trips prose but returns calculation blocks empty",

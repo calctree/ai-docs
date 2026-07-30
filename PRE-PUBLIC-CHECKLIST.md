@@ -33,7 +33,26 @@ creating pages with `crypto.randomUUID()` and they work. One of those is wrong, 
 is "client-minted ids of either shape are accepted", which is what we currently believe.
 Settle it with a live test before either claim is published.
 
-## Blocker 3: stale content
+## Blocker 3: the latest-revision sentinel is ad-hoc everywhere
+
+Revision ids are KSUIDs (`xksuid`, base62). The canonical sentinel for "latest" is
+`REVISION_INFINITE = RevisionId('~')` in `calculations/packages/common/src/types.ts`, and `~`
+is correct because it sorts above every base62 character.
+
+Nothing else uses it. `calculations/packages/core/src/admin.ts` passes `'fffffff'` (seven f
+characters), our harness passes `'ffffffffff'` (ten), and the old public docs told people to
+use `'ffffffff'` (eight). None of those is safe: a KSUID beginning with any letter after `f`
+sorts **above** them, so a hex-style sentinel silently stops meaning "latest" depending on
+which revision id the platform happened to mint.
+
+- **Needed:** confirm what the public GraphQL API accepts as the latest-revision sentinel,
+  then say exactly that once. If `~` works through the gateway, publish `~` and fix the
+  internal callers.
+- **Do not publish a hex value.** The current context7 rule says as much and marks it
+  untested.
+- **Owner:** platform / tech team, plus a live test from our side.
+
+## Blocker 4: stale content
 
 Every doc here predates 2026-02 and none has been re-verified: `API_REFERENCE.md` (726 lines,
 2025-11-08), `EXAMPLES.md` (904), `TROUBLESHOOTING.md` (437), `CALCULATION_GUIDE.md` (447),
@@ -45,7 +64,7 @@ quick start teaches Blocker 1.
 Open question: `MDX_SYNTAX.md` (634) and `PYTHON_GUIDE.md` (408) are reference material that
 `SKILL.md` does not replace. Keep and re-verify, or ditch.
 
-## Blocker 4: repo identity
+## Blocker 5: repo identity
 
 Rename to the convention for a published AI skillset, `calctree-skills` laid out as
 `skills/calctree/SKILL.md`, plus `llms.txt` at the root. GitHub redirects the old URL, but
