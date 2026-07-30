@@ -119,14 +119,72 @@ bite:
   such value fails the whole cell with "Ambiguous operation with offset unit".
 - Multi-branch categorical results belong in Python plus a table, not a nested ternary.
 
-## 7. Linking pages
+## 7. Python statements
+
+A `python` engine statement runs server-side with two globals injected, `ct` and `ctconfig`.
+The full surface, from the engine:
+
+| | |
+|---|---|
+| `ct.quantity` | pint `Quantity`. `force = ct.quantity("1 N")` |
+| `ct.units` | the pint `UnitRegistry`. `kN = ct.units("kN")` |
+| `ct.open` | read or write a file attached to the page: `ct.open('data.csv', mode='r')` |
+| `ct.page_files` | presigned URLs for the page's files |
+| `ct.keep_file` | persist a file back to the page |
+| `ct.keep_dataframe`, `ct.load_dataframe` | persist and reload a dataframe between runs |
+| `ctconfig.plot_prefix` | the prefix used to name emitted plot images |
+
+Units, and the mistake everyone makes:
+
+- **MathJS variables with units arrive already wrapped as `ct.quantity` objects. Do not wrap
+  them again.** Referencing `V_Ed` from the page scope gives you a pint quantity, not a float.
+- Create new ones with `ct.quantity("100 kN")`. Arithmetic across units works:
+  `force / area` gives a pressure.
+- Convert with `.to('unit')`. Read the number with **`.magnitude`, which is a property, not a
+  method**: `.magnitude` not `.magnitude()`.
+- pint raises on incoherent operations, so adding a length to a time fails loudly. That is
+  intended.
+- **Never put an offset unit (`degC`, `degF`) in scope on a page with a Python cell.** One such
+  value fails the entire cell with "Ambiguous operation with offset unit".
+
+Plots:
+
+- `ctconfig.plot_prefix` is **pre-set per statement** to `ct_plot_<statementId>_`, which you
+  cannot predict when authoring MDX. So set your own (`ctconfig.plot_prefix = "beam"`) and
+  reference the first image as `beam1`, otherwise the image mention cannot resolve.
+- End with `plt.show()`. A bare `fig` emits nothing.
+
+Only libraries pre-installed in the environment can be imported; imports are checked before
+execution. The engineering set includes `numpy`, `pandas`, `scipy`, `sympy`, `matplotlib`,
+`seaborn`, `pint`, `handcalcs`, `sectionproperties`, `concreteproperties`, `structuralcodes`,
+`steelpy`, `anastruct`, `beambending`, `indeterminatebeam`, `pycba`, `pynitefea`, `openseespy`,
+`opsvis`, `pycufsm`, `pycalculix`, `compas`, `ezdxf`, `shapely` via `cad-to-shapely`, `gempy`,
+`groundhog`, `pygef`, `fluids`, `thermo`, `ht`, `fipy`, `nutils`, `duckdb`, `pyarrow`,
+`openpyxl`, `scikit-learn`, `pymc`, `arviz`, `specklepy`, `blue-prints`.
+
+## 8. The MDX component vocabulary
+
+Calculation content is MDX. The components you will actually use:
+
+| Component | Purpose |
+|---|---|
+| `<Assignment>` | one named formula |
+| `<EquationBlock>` | several formulas in one block |
+| `<Python>` | a Python statement, needs a `name` or the node shows as "Untitled" |
+| `<Mention>` | display a computed value, an image, or a traffic-light chip |
+| `<TrafficLights>` | the pass/fail chip, driven by a named boolean |
+| `<MatrixBlock>` | matrix input and output |
+| `<SimpleInput>`, `<SelectInput>`, `<RadioInput>` | interactive inputs |
+| `<RichTable>` | a table whose cells hold components; plain GFM pipe tables otherwise |
+
+## 9. Linking pages
 
 A cross-page reference is a snapshot of the source page's computed values, created as a
 `multiline_mathjs` statement whose object carries a metadata key alongside the values. That
 metadata key is what makes it a source-linked page reference rather than a plain block.
 Summary and roll-up pages should **reference** upstream results, not recompute them.
 
-## 8. Gotchas worth knowing before you start
+## 10. Gotchas worth knowing before you start
 
 - Deleting a page is a **soft** delete. Trashed pages still come back from the pages query
   and accumulate, which slows workspace sync.

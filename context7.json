@@ -4,8 +4,7 @@
   "description": "How to drive CalcTree programmatically: create and read engineering calculation pages via the GraphQL API, with MathJS and Python statements and real unit handling",
   "folders": [
     "skills",
-    "primitives",
-    "reference"
+    "primitives"
   ],
   "excludeFolders": [
     "archive",
@@ -31,7 +30,7 @@
     "Escape < and > as &lt; and &gt; everywhere including prose: a raw one truncates the MDX import from that point on",
     "MathJS variables with units arrive in Python as ct.quantity() objects already: do not wrap them again. Create new ones with ct.quantity('100 kN'), convert with .to('unit'), and read the number with .magnitude, which is a property and not a method call",
     "CalcTree uses pint for units in Python, so invalid unit operations raise. Never put an offset unit (degC, degF) in scope on a page with a Python cell: it fails the whole cell with 'Ambiguous operation with offset unit'",
-    "Only use Python libraries pre-installed in the CalcTree environment: see reference/PYTHON_GUIDE.md",
+    "Only use Python libraries pre-installed in the CalcTree environment: see the Python section of the skill",
     "Deleting a page is a soft delete: trashed pages still return from the pages query",
     "In-place content edits cannot remove or reorder body nodes, and leave old statements behind so variables end up defined twice and the page nulls out. To replace content, delete the page and re-create it",
     "Page URLs follow the format https://app.calctree.com/edit/{workspaceId}/{pageId}"

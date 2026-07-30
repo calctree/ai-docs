@@ -15,11 +15,6 @@ calculation pages, and it supersedes any older CalcTree API documentation.
 - [Auth](primitives/auth.ts): minting a Bearer token.
 - [End-to-end example](primitives/examples/smoke-two-page.ts): creates two linked pages and reads the computed values back.
 
-## Reference
-
-- [MDX syntax](reference/MDX_SYNTAX.md): the component vocabulary. Not re-verified since 2026-01.
-- [Python guide](reference/PYTHON_GUIDE.md): the pre-installed library list. Not re-verified since 2026-01.
-
 ## Notes
 
 - Use `Authorization: Bearer <jwt>` for content writes, not `x-api-key`.

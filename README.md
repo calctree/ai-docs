@@ -14,7 +14,6 @@ primitives/                   working code
   calctree-api.ts             pages, MDX content, calculations, page references
   auth.ts                     Bearer token minting
   examples/                   end-to-end example
-reference/                    MDX component vocabulary, Python library list
 llms.txt                      machine-readable index
 ```
 
