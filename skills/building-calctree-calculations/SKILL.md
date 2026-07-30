@@ -42,6 +42,12 @@ calculation service, so `insertMDXContent` creates the body node while the state
 rejected: you get a page that looks correct with empty calculation blocks and no error.
 Bearer creates the node and the statement together.
 
+This is a known platform limitation rather than the intended design. When it is fixed, the API
+key becomes the normal path for every call and this section changes accordingly. Until then, the API key is
+fine for reads and for every other mutation; only `insertMDXContent` and
+`createOrUpdateCalculation` need a login-minted Bearer. Either way, **check the response**: a
+write that returns zero created statements has failed, whatever the HTTP status says.
+
 ## 2. The write path
 
 Two calls, in order:
