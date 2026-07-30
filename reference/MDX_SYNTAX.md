@@ -1,5 +1,9 @@
 # CalcTree MDX Syntax Guide
 
+> **Not re-verified since 2026-01.** This is reference vocabulary carried over from the
+> previous documentation set. The verified account of how to drive CalcTree is
+> [`skills/calctree/SKILL.md`](../skills/calctree/SKILL.md); where the two disagree, the skill wins.
+
 Complete reference for writing CalcTree page content with MDX components and markdown.
 
 ---

@@ -1,0 +1,20 @@
+{
+  "name": "@calctree/skill",
+  "version": "0.1.0",
+  "description": "Primitives for driving CalcTree via the GraphQL API: pages, MDX content, calculations, page references",
+  "type": "module",
+  "exports": {
+    ".": "./calctree-api.ts",
+    "./auth": "./auth.ts"
+  },
+  "files": ["calctree-api.ts", "auth.ts", "examples"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/calctree/calctree-skills.git",
+    "directory": "primitives"
+  },
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "tsx": ">=4"
+  }
+}

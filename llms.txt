@@ -1,0 +1,27 @@
+# CalcTree
+
+> CalcTree is an engineering calculation platform. A page holds prose plus calculation blocks; the blocks form a calculation graph that evaluates server-side with real units. This repo is the single source of truth for driving CalcTree programmatically from outside the platform.
+
+Read the skill first. It is the verified, current account of how to create and read
+calculation pages, and it supersedes any older CalcTree API documentation.
+
+## Start here
+
+- [CalcTree skill](skills/calctree/SKILL.md): auth, the write path, MDX calculation syntax, formula rules, and the authoring rules that decide whether a generated page reads correctly.
+
+## Working code
+
+- [Primitives](primitives/calctree-api.ts): page creation with tree registration, MDX content insert, calculation writes, page context reads, cross-page references.
+- [Auth](primitives/auth.ts): minting a Bearer token.
+- [End-to-end example](primitives/examples/smoke-two-page.ts): creates two linked pages and reads the computed values back.
+
+## Reference
+
+- [MDX syntax](reference/MDX_SYNTAX.md): the component vocabulary. Not re-verified since 2026-01.
+- [Python guide](reference/PYTHON_GUIDE.md): the pre-installed library list. Not re-verified since 2026-01.
+
+## Notes
+
+- Use `Authorization: Bearer <jwt>` for content writes, not `x-api-key`.
+- A page must be registered in the page tree or it is orphaned and invisible.
+- Evaluation is asynchronous: settle about two seconds after a write before reading.

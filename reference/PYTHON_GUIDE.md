@@ -1,5 +1,9 @@
 # Python Engine - Complete Guide
 
+> **Not re-verified since 2026-01.** This is reference vocabulary carried over from the
+> previous documentation set. The verified account of how to drive CalcTree is
+> [`skills/calctree/SKILL.md`](../skills/calctree/SKILL.md); where the two disagree, the skill wins.
+
 The python engine is fully supported and working. The key requirement is including `userId` in the `data` field.
 
 ## Complete Python Example
