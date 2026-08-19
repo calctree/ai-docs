@@ -1,0 +1,75 @@
+<Connection software="excel" model="ETABS_Reactions.xlsx" name="Excel — ETABS to STAAD Reactions" requires="Export Joint Reactions table from ETABS to this Excel file first">
+<Var name="header_check" sheet="Joint Reactions" cell="A1" />
+<Script>
+```python
+ws = wb.Worksheets("Joint Reactions")
+used = ws.UsedRange
+last_row = used.Rows.Count
+
+joints = {}
+for row in range(2, last_row + 1):
+    joint = ws.Range(f"A{row}").Value2
+    fx = ws.Range(f"C{row}").Value2 or 0
+    fy = ws.Range(f"D{row}").Value2 or 0
+    fz = ws.Range(f"E{row}").Value2 or 0
+
+    if joint not in joints:
+        joints[joint] = {"Fx_max": 0, "Fy_max": 0, "Fz_max": 0}
+    joints[joint]["Fx_max"] = max(joints[joint]["Fx_max"], abs(float(fx)))
+    joints[joint]["Fy_max"] = max(joints[joint]["Fy_max"], abs(float(fy)))
+    joints[joint]["Fz_max"] = max(joints[joint]["Fz_max"], abs(float(fz)))
+
+staad_ws_name = "STAAD Format"
+try:
+    ws_out = wb.Worksheets(staad_ws_name)
+except:
+    ws_out = wb.Worksheets.Add()
+    ws_out.Name = staad_ws_name
+
+ws_out.Range("A1").Value2 = "Joint"
+ws_out.Range("B1").Value2 = "Fx_max"
+ws_out.Range("C1").Value2 = "Fy_max"
+ws_out.Range("D1").Value2 = "Fz_max"
+
+for i, (jt, vals) in enumerate(joints.items()):
+    row = i + 2
+    ws_out.Range(f"A{row}").Value2 = jt
+    ws_out.Range(f"B{row}").Value2 = vals["Fx_max"]
+    ws_out.Range(f"C{row}").Value2 = vals["Fy_max"]
+    ws_out.Range(f"D{row}").Value2 = vals["Fz_max"]
+
+staad_transfer_summary = f"Reformatted {len(joints)} joints from ETABS export to STAAD format"
+```
+</Script>
+</Connection>
+
+## F2 — ETABS to STAAD Reaction Reformat
+
+**Category:** Excel-Only | **Tests:** `<Var>` + `<Script>` — read sheet, create new sheet, write reformatted data
+
+Reads an ETABS-exported Joint Reactions table from Excel, envelopes force
+components per joint, and writes a reformatted summary to a new "STAAD Format"
+sheet suitable for STAAD import.
+
+### What this tests
+
+- `<Var>` reading a header cell for validation
+- `ws.UsedRange.Rows.Count` — discovering data extent
+- Row-by-row COM reading with per-cell access
+- Envelope logic (max abs value per joint)
+- **Creating a new worksheet** via `wb.Worksheets.Add()` + renaming
+- Try/except for checking if sheet already exists
+- Writing headers + data to the new sheet
+
+### Prerequisites
+
+1. Export "Joint Reactions" from ETABS to Excel
+2. Sheet named "Joint Reactions" with joint IDs in column A, forces in C-E
+3. Multiple rows per joint (different load cases)
+
+### Expected behaviour
+
+- A new "STAAD Format" sheet is created (or reused if it exists)
+- Headers: Joint, Fx_max, Fy_max, Fz_max
+- One row per joint with absolute max forces across all cases
+- `staad_transfer_summary` — e.g. "Reformatted 20 joints from ETABS export to STAAD format"

@@ -1,0 +1,62 @@
+<Connection software="etabs" model="Building.edb" name="ETABS — Column Base Reactions" requires="Run analysis in ETABS before syncing">
+<Var name="joint_labels" table="Joint Reactions" column="UniqueName" />
+<Var name="reaction_fx" table="Joint Reactions" column="F1" />
+<Var name="reaction_fy" table="Joint Reactions" column="F2" />
+<Var name="reaction_fz" table="Joint Reactions" column="F3" />
+<Var name="reaction_mx" table="Joint Reactions" column="M1" />
+<Var name="reaction_my" table="Joint Reactions" column="M2" />
+<Var name="reaction_mz" table="Joint Reactions" column="M3" />
+<Var name="reaction_cases" table="Joint Reactions" column="OutputCase" />
+<Script>
+```python
+rows = parse_table("Joint Reactions")
+
+base_joints = {}
+for r in rows:
+    jt = r.get("UniqueName", "")
+    case = r.get("OutputCase", "")
+    key = f"{jt}_{case}"
+    base_joints[key] = {
+        "joint": jt,
+        "case": case,
+        "Fz": float(r.get("F3", 0)),
+        "Mx": float(r.get("M1", 0)),
+        "My": float(r.get("M2", 0)),
+    }
+
+reaction_count = len(base_joints)
+max_axial = max((v["Fz"] for v in base_joints.values()), default=0)
+reaction_summary = f"Extracted {reaction_count} reaction records. Max axial = {max_axial:.1f} kN"
+```
+</Script>
+</Connection>
+
+## A2 — Column Base Reactions
+
+**Category:** ETABS Read-Only | **Tests:** `<Var>` pull (7 columns) + `<Script>`
+
+Extracts column base reactions (F1-F3, M1-M3) for all load cases — the starting
+point for foundation design (isolated footings, piles, mats).
+
+### What this tests
+
+- Pulling 8 columns from the same ETABS table simultaneously
+- Building a keyed dictionary from parsed rows
+- `max()` aggregation across numeric values
+- Formatted string output with f-string float precision
+
+### Prerequisites
+
+1. ETABS model with columns reaching ground level
+2. Analysis run with gravity + lateral cases
+3. "Joint Reactions" table populated
+
+### Expected behaviour
+
+- `reaction_count` — total joint x case records (e.g. 120)
+- `max_axial` — maximum F3 value across all joints/cases
+- `reaction_summary` — human-readable summary string
+
+### Verified against
+
+- `ebrahimraeyat/etabs_api/results.py` — `get_base_reactions()` function

@@ -1,0 +1,45 @@
+<Connection software="excel" model="PileDesign.xlsx" name="Excel — SPT Pile Capacity" requires="Open PileDesign.xlsx with SPT bore log data in 'Borelog' sheet">
+<Var name="pile_diameter" sheet="Input" cell="B3" />
+<Var name="pile_length" sheet="Input" cell="B4" />
+<Var name="pile_type" sheet="Input" cell="B5" />
+<Var name="water_table" sheet="Input" cell="B8" />
+<Var name="spt_n_values" sheet="Borelog" cell="C2" />
+<Var name="layer_depths" sheet="Borelog" cell="A2" />
+<Var name="axial_capacity" sheet="Results" cell="D3" />
+<Var name="lateral_capacity" sheet="Results" cell="D4" />
+<Var name="settlement" sheet="Results" cell="D8" />
+</Connection>
+
+## F3 — SPT Pile Capacity
+
+**Category:** Excel-Only | **Tests:** `<Var>` only — no `<Script>`, no `<Input>`
+
+Reads inputs and outputs from an Excel-based pile design spreadsheet.
+Pulls geometry (diameter, length, type), site data (water table, SPT N-values),
+and computed results (axial capacity, lateral capacity, settlement).
+
+### What this tests
+
+- `<Var>` tags reading from **three different sheets** (Input, Borelog, Results)
+- 9 `<Var>` tags with no `<Script>` or `<Input>` — pure pull-only connection
+- Simplest possible connection: just variable bindings, no scripting
+- Tests whether values round-trip correctly as CalcTree variables
+
+### Prerequisites
+
+1. Excel workbook with three sheets:
+   - "Input" — pile geometry parameters (B3:B8)
+   - "Borelog" — SPT test data (depths in A, N-values in C)
+   - "Results" — computed capacities (D3, D4, D8)
+
+### Expected behaviour
+
+- All 9 variables should populate with the cell values
+- `pile_diameter` — number (e.g. 0.6)
+- `pile_type` — string (e.g. "Bored" or "Driven")
+- `axial_capacity` — number from Results sheet formula
+- No script output — test passes if all vars have values after sync
+
+### Verified against
+
+- `geoeq/geoeq` — SPT pile capacity functions (Python library, not Excel)

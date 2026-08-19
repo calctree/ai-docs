@@ -1,0 +1,53 @@
+<Connection software="etabs" model="Project.edb" name="ETABS — BOQ Extraction" requires="Ensure ETABS model has assigned sections and materials">
+<Var name="frame_sections" table="Frame Assignments - Summary" column="AnalSect" />
+<Var name="frame_stories" table="Frame Assignments - Summary" column="Story" />
+<Var name="frame_labels" table="Frame Assignments - Summary" column="UniqueName" />
+<Var name="frame_lengths" table="Frame Assignments - Summary" column="Length" />
+<Script>
+```python
+rows = parse_table("Frame Assignments - Summary")
+
+boq = {}
+for r in rows:
+    section = r.get("AnalSect", "Unknown")
+    story = r.get("Story", "Unknown")
+    length = float(r.get("Length", 0))
+    key = f"{story}_{section}"
+    if key not in boq:
+        boq[key] = {"story": story, "section": section, "count": 0, "total_length": 0.0}
+    boq[key]["count"] += 1
+    boq[key]["total_length"] += length
+
+boq_rows = sorted(boq.values(), key=lambda x: (x["story"], x["section"]))
+boq_summary = f"Found {len(boq_rows)} unique story-section groups across {len(rows)} elements"
+```
+</Script>
+</Connection>
+
+## A3 — BOQ Extraction
+
+**Category:** ETABS Read-Only | **Tests:** `<Var>` pull + `<Script>` with grouping logic
+
+Reads element quantities from ETABS and groups by story + section for a bill of
+quantities summary. Counts members and totals lengths per group.
+
+### What this tests
+
+- Dictionary-based grouping of parsed table rows
+- Numeric accumulation (`total_length`)
+- Sorted output from grouped data
+- Handling of models with many frame types
+
+### Prerequisites
+
+1. ETABS model with beams and columns assigned to named sections
+2. No analysis required — this reads assignment data only
+
+### Expected behaviour
+
+- `boq_rows` — list of dicts with story, section, count, total_length
+- `boq_summary` — e.g. "Found 15 unique story-section groups across 240 elements"
+
+### Verified against
+
+- `danielogg92/Etabs-API-Python` — `get_all_frames()` geometry extraction

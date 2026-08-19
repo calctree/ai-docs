@@ -1,0 +1,77 @@
+<Connection software="etabs" model="Optimise.edb" name="ETABS — Section Optimisation" requires="Run concrete design in ETABS first">
+<Var name="col_labels" table="Concrete Column PMM Envelope" column="UniqueName" />
+<Var name="col_ratios" table="Concrete Column PMM Envelope" column="DCRatio" />
+<Var name="col_sections" table="Concrete Column PMM Envelope" column="Section" />
+<Script>
+```python
+rows = parse_table("Concrete Column PMM Envelope")
+
+overstressed = []
+for r in rows:
+    label = r.get("UniqueName", "")
+    ratio = float(r.get("DCRatio", 0))
+    section = r.get("Section", "")
+    if ratio > 1.0:
+        overstressed.append({"label": label, "ratio": ratio, "section": section})
+
+upgrade_map = {
+    "C300x300": "C350x350",
+    "C350x350": "C400x400",
+    "C400x400": "C450x450",
+    "C450x450": "C500x500",
+}
+
+upgraded = 0
+for col in overstressed:
+    old = col["section"]
+    new = upgrade_map.get(old)
+    if new:
+        ret = sap.FrameObj.SetSection(col["label"], new)
+        if ret == 0:
+            upgraded += 1
+
+if upgraded > 0:
+    sap.Analyze.RunAnalysis()
+
+optimise_summary = f"Found {len(overstressed)} overstressed columns. Upgraded {upgraded} sections. Re-analysis {'triggered' if upgraded > 0 else 'not needed'}."
+```
+</Script>
+</Connection>
+
+## C1 — Section Optimisation Loop
+
+**Category:** ETABS Round-Trip | **Tests:** `<Var>` read + `<Script>` write + re-analyse
+
+Reads concrete column DC ratios, identifies overstressed members (DCR &gt; 1.0),
+upsizes their sections via a predefined upgrade map, and triggers re-analysis.
+
+### What this tests
+
+- `<Var>` pulling design results (DCRatio)
+- `parse_table()` for design output tables
+- Conditional write: only modify overstressed columns
+- `sap.FrameObj.SetSection()` — changing section assignments
+- `sap.Analyze.RunAnalysis()` — triggering re-analysis from script
+- Full read-modify-reanalyse round-trip in a single connection
+
+### Prerequisites
+
+1. ETABS model with concrete columns designed (ACI 318 or similar)
+2. Some columns should be overstressed (DCR &gt; 1.0) for the test to be meaningful
+3. The upgrade_map section names must match your model's section names
+
+### Expected behaviour
+
+- `overstressed` — list of columns with DCR &gt; 1.0
+- `upgraded` — count of successfully upsized columns
+- `optimise_summary` — e.g. "Found 5 overstressed columns. Upgraded 3 sections. Re-analysis triggered."
+- ETABS should show the re-analysis running after sync
+
+### Caution
+
+This script modifies section assignments and runs analysis. Use on a copy of your model.
+
+### Verified against
+
+- `AesirX899/etabs-python-api` — iterative drift + section resize loop
+- `nhniegas/Etabs_Designer` — concrete design results extraction

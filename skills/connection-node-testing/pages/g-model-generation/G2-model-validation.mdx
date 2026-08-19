@@ -1,0 +1,82 @@
+<Connection software="etabs" model="FromPDF.edb" name="ETABS — Model Validation" requires="Open the AI-generated ETABS model">
+<Var name="num_frames" table="Frame Object Connectivity" column="UniqueName" />
+<Var name="num_areas" table="Area Object Connectivity" column="UniqueName" />
+<Var name="num_joints" table="Joint Coordinates" column="UniqueName" />
+<Var name="materials" table="Material Properties" column="Name" />
+<Var name="sections" table="Frame Section Properties" column="Name" />
+<Script>
+```python
+frames = parse_table("Frame Object Connectivity")
+areas = parse_table("Area Object Connectivity")
+joints = parse_table("Joint Coordinates")
+materials = parse_table("Material Properties")
+sections = parse_table("Frame Section Properties")
+
+frame_count = len(frames)
+area_count = len(areas)
+joint_count = len(joints)
+mat_names = [m.get("Name", "") for m in materials]
+sec_names = [s.get("Name", "") for s in sections]
+
+issues = []
+if frame_count == 0:
+    issues.append("No frame objects found")
+if joint_count == 0:
+    issues.append("No joints found")
+if not mat_names:
+    issues.append("No materials defined")
+
+floating_joints = []
+for j in joints:
+    jname = j.get("UniqueName", "")
+    connected = any(
+        f.get("Joint1") == jname or f.get("Joint2") == jname
+        for f in frames
+    )
+    if not connected:
+        floating_joints.append(jname)
+
+validation_summary = f"Model: {frame_count} frames, {area_count} areas, {joint_count} joints. Materials: {mat_names}. Sections: {sec_names}. Floating joints: {len(floating_joints)}. Issues: {issues if issues else 'None'}"
+```
+</Script>
+</Connection>
+
+## G2 — Model Validation
+
+**Category:** Model Generation | **Tests:** `<Var>` from 5 tables + cross-table validation in `<Script>`
+
+Validates an ETABS model by reading connectivity, properties, and coordinates.
+Checks for missing elements, undefined materials, and floating joints (nodes
+not connected to any frame).
+
+### What this tests
+
+- `<Var>` tags from 5 different tables simultaneously
+- `parse_table()` called 5 times in one script
+- Cross-table validation logic (joints vs frame connectivity)
+- List comprehension with `any()` for membership testing
+- Issue accumulation pattern (empty list = pass)
+- Large data processing (iterating all joints against all frames)
+
+### Prerequisites
+
+1. Any ETABS model — works on new models, imported models, or AI-generated models
+2. No analysis required — reads geometric/property data only
+
+### Expected behaviour
+
+- Element counts: `frame_count`, `area_count`, `joint_count`
+- Property lists: `mat_names`, `sec_names`
+- `floating_joints` — list of joint names not connected to frames
+- `issues` — list of problems found (empty if model is clean)
+- `validation_summary` — comprehensive one-line model report
+
+### Note
+
+The floating joint check does O(joints x frames) comparisons, which may be slow
+on very large models (1000+ joints). This is intentional for testing script
+execution time limits.
+
+### Verified against
+
+- `danielogg92/Etabs-API-Python` — `get_all_frames()`, `get_all_materials()`

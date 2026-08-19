@@ -1,0 +1,67 @@
+<Connection software="safe" model="Foundation.fdb" name="SAFE — Subgrade Modulus Update" requires="Open foundation model in SAFE with area springs">
+<Var name="slab_labels" table="Area Object Definitions" column="UniqueName" />
+<Var name="spring_values" table="Area Spring Assignments" column="Ks" />
+<Script>
+```python
+areas = parse_table("Area Object Definitions")
+springs = parse_table("Area Spring Assignments")
+
+ks_values = {
+    "Zone_A": 25000,
+    "Zone_B": 18000,
+    "Zone_C": 12000,
+}
+
+updated = 0
+for area in areas:
+    label = area.get("UniqueName", "")
+    x = float(area.get("XCentroid", 0))
+    y = float(area.get("YCentroid", 0))
+
+    if x < 10:
+        ks = ks_values["Zone_A"]
+    elif x < 20:
+        ks = ks_values["Zone_B"]
+    else:
+        ks = ks_values["Zone_C"]
+
+    ret = sap.AreaObj.SetSpring(label, ks, 0, 0, 0, 0, 0)
+    if ret == 0:
+        updated += 1
+
+spring_summary = f"Updated subgrade modulus for {updated} / {len(areas)} slab areas"
+```
+</Script>
+</Connection>
+
+## E3 — SAFE Foundation Springs
+
+**Category:** Cross-Tool Transfer | **Tests:** SAFE connection with `<Var>` read + `<Script>` write
+
+Reads area objects from SAFE, assigns zone-based subgrade modulus (Ks) values
+based on X-coordinate position, and writes spring stiffness back to each slab area.
+
+### What this tests
+
+- **SAFE software type** (not ETABS) — tests `software="safe"` adapter
+- `<Var>` reading from SAFE database tables
+- `parse_table()` working with SAFE (same CSI API pattern)
+- `sap.AreaObj.SetSpring()` — writing spring assignments
+- Coordinate-based zone classification logic
+- Return value checking on per-element writes
+
+### Prerequisites
+
+1. SAFE foundation model open with area objects defined
+2. Area spring assignments table exists
+3. Model has area objects with centroid coordinates
+
+### Expected behaviour
+
+- `updated` — count of areas with successfully assigned springs
+- `spring_summary` — e.g. "Updated subgrade modulus for 45 / 45 slab areas"
+- Check SAFE: area spring assignments should show updated Ks values
+
+### Caution
+
+This modifies spring assignments in the SAFE model. Use on a copy.

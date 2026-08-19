@@ -1,0 +1,62 @@
+<Connection software="excel" model="ETABS_Export.xlsx" name="Excel — Column Grouping from ETABS Export" requires="Export 'Concrete Column Design Summary' from ETABS to Excel first">
+<Var name="raw_data_check" sheet="Concrete Column Design Summary" cell="A1" />
+<Script>
+```python
+ws = wb.Worksheets("Concrete Column Design Summary")
+
+used_range = ws.UsedRange
+last_row = used_range.Rows.Count
+last_col = used_range.Columns.Count
+
+headers_raw = ws.Range(f"A1:{chr(64+last_col)}1").Value2
+headers = list(headers_raw[0]) if headers_raw else []
+
+story_idx = headers.index("Story") if "Story" in headers else -1
+section_idx = headers.index("Section") if "Section" in headers else -1
+steel_idx = headers.index("AsProvided") if "AsProvided" in headers else -1
+
+groups = {}
+for row_num in range(2, last_row + 1):
+    row_data = ws.Range(f"A{row_num}:{chr(64+last_col)}{row_num}").Value2
+    if row_data and row_data[0]:
+        vals = list(row_data[0])
+        story = vals[story_idx] if story_idx >= 0 else ""
+        section = vals[section_idx] if section_idx >= 0 else ""
+        steel = float(vals[steel_idx]) if steel_idx >= 0 else 0
+        key = f"{story}_{section}"
+        if key not in groups:
+            groups[key] = {"count": 0, "max_steel": 0}
+        groups[key]["count"] += 1
+        groups[key]["max_steel"] = max(groups[key]["max_steel"], steel)
+
+grouping_excel_summary = f"Parsed {last_row - 1} rows into {len(groups)} groups"
+```
+</Script>
+</Connection>
+
+## D3 — Column Grouping from ETABS Excel Export
+
+**Category:** Excel-Only (ETABS export) | **Tests:** `<Var>` + `<Script>` — Excel data parsing
+
+Reads an ETABS-exported Excel file containing the Concrete Column Design Summary,
+parses headers dynamically, and groups columns by story + section with max steel tracking.
+
+### What this tests
+
+- Single Excel connection with `<Var>` reading a cell and `<Script>` processing bulk data
+- `ws.UsedRange` — discovering data extents
+- Dynamic header detection via `headers.index()`
+- Row-by-row COM data extraction with `ws.Range(...).Value2`
+- Tuple-to-list conversion from Excel COM returns
+- `chr(64+n)` column letter calculation
+
+### Prerequisites
+
+1. Export "Concrete Column Design Summary" from ETABS to an Excel file
+2. Sheet must be named "Concrete Column Design Summary" (ETABS default)
+3. Headers must include "Story", "Section", "AsProvided"
+
+### Expected behaviour
+
+- `grouping_excel_summary` — e.g. "Parsed 80 rows into 12 groups"
+- Each group tracks count of members and maximum steel area

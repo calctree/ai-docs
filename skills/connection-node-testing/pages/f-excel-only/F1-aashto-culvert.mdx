@@ -1,0 +1,55 @@
+<Connection software="excel" model="CulvertDesign.xlsx" name="Excel — AASHTO Culvert Design" requires="Open CulvertDesign.xlsx with Input and Results sheets">
+<Var name="span" sheet="Input" cell="B3" />
+<Var name="rise" sheet="Input" cell="B4" />
+<Var name="fill_depth" sheet="Input" cell="B5" />
+<Var name="fc" sheet="Input" cell="B8" />
+<Var name="fy" sheet="Input" cell="B9" />
+<Var name="soil_unit_wt" sheet="Input" cell="B12" />
+<Var name="moment_top" sheet="Results" cell="D5" />
+<Var name="moment_bot" sheet="Results" cell="D6" />
+<Var name="shear_critical" sheet="Results" cell="D10" />
+<Var name="design_status" sheet="Results" cell="D15" />
+<Script>
+```python
+ws_in = wb.Worksheets("Input")
+ws_out = wb.Worksheets("Results")
+
+span_val = ws_in.Range("B3").Value2
+rise_val = ws_in.Range("B4").Value2
+fill_val = ws_in.Range("B5").Value2
+
+status = ws_out.Range("D15").Value2
+m_top = ws_out.Range("D5").Value2
+m_bot = ws_out.Range("D6").Value2
+
+culvert_summary = f"Culvert {span_val}m x {rise_val}m, fill={fill_val}m. Status: {status}. M_top={m_top}, M_bot={m_bot}"
+```
+</Script>
+</Connection>
+
+## F1 — AASHTO Culvert Design Sheet
+
+**Category:** Excel-Only | **Tests:** `<Var>` from two sheets + `<Script>` reading computed cells
+
+Connects to an Excel-based AASHTO culvert design spreadsheet. Pulls geometry
+inputs from the Input sheet and computed results from the Results sheet.
+
+### What this tests
+
+- Excel `<Var>` tags reading from **two different sheets** (Input + Results)
+- 10 `<Var>` tags with specific cell addresses
+- `<Script>` reading additional cells via COM (redundant read for validation)
+- `wb.Worksheets("...")` — switching between sheets in script
+- Mixed input/output cell reads (geometry inputs + computed design results)
+
+### Prerequisites
+
+1. An AASHTO culvert design spreadsheet with:
+   - "Input" sheet with geometry in B3:B5 and material props in B8:B12
+   - "Results" sheet with computed moments in D5:D6, shear in D10, status in D15
+2. Formulas in the Results sheet should be live (not values-only)
+
+### Expected behaviour
+
+- `<Var>` values populate with the cell contents (numbers for dimensions, string for status)
+- `culvert_summary` — e.g. "Culvert 3.0m x 2.0m, fill=1.5m. Status: PASS. M_top=45.2, M_bot=38.7"

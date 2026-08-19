@@ -1,0 +1,73 @@
+<Connection software="etabs" model="NewBuilding.edb" name="ETABS — Load Pattern Setup" requires="Open a new or existing ETABS model">
+<Script>
+```python
+patterns = [
+    ("Dead",  1, 0),     # (name, type, selfWtMultiplier)
+    ("SDL",   2, 0),
+    ("Live",  3, 0),
+    ("RoofLive", 3, 0),
+    ("EQx",   5, 0),
+    ("EQy",   5, 0),
+    ("Wx",    6, 0),
+    ("Wy",    6, 0),
+]
+
+created_patterns = 0
+for name, lp_type, sw in patterns:
+    ret = sap.LoadPatterns.Add(name, lp_type, sw)
+    if ret == 0:
+        created_patterns += 1
+
+ret = sap.LoadPatterns.SetSelfWtMultiplier("Dead", 1.0)
+
+sap.PropMaterial.SetMassSource_1(
+    True,   # isDefault
+    False,  # isFromLoads
+    True,   # isFromMasses
+    1,      # numberLoads
+    ["Dead"],
+    [1.0]
+)
+
+ret = sap.LoadCases.StaticNonlinear.SetCase("PDelta")
+if ret == 0:
+    sap.LoadCases.StaticNonlinear.SetGeometricNonlinearity("PDelta", 1)
+    sap.LoadCases.StaticNonlinear.SetLoads("PDelta", 1, ["Dead"], [0], [1.0])
+
+pattern_summary = f"Created {created_patterns} load patterns, mass source, and P-Delta case"
+```
+</Script>
+</Connection>
+
+## B3 — Load Pattern Generation
+
+**Category:** ETABS Write | **Tests:** `<Script>` — multi-API-call model setup
+
+Creates load patterns, sets self-weight multiplier, configures mass source,
+and creates a P-Delta nonlinear load case — all in one script.
+
+### What this tests
+
+- `sap.LoadPatterns.Add()` — batch creating load patterns with different types
+- `sap.LoadPatterns.SetSelfWtMultiplier()` — modifying a created pattern
+- `sap.PropMaterial.SetMassSource_1()` — mass source configuration with arrays
+- `sap.LoadCases.StaticNonlinear.SetCase()` — creating a nonlinear case
+- Chained API calls with return value checking
+- Script with no `<Var>` or `<Input>` tags
+
+### Prerequisites
+
+1. A new or mostly empty ETABS model
+2. No existing patterns with the same names
+
+### Expected behaviour
+
+- `pattern_summary` — "Created 8 load patterns, mass source, and P-Delta case"
+- Check ETABS: Define &gt; Load Patterns should show all 8
+- Dead pattern should have self-weight multiplier = 1.0
+- A "PDelta" load case should exist under Define &gt; Load Cases
+
+### Verified against
+
+- `EhsanAlizadeh1/ETABS-API-Example/API_1.py` — full model setup from scratch
+- `ebrahimraeyat/etabs_api/load_patterns.py` — pattern type detection

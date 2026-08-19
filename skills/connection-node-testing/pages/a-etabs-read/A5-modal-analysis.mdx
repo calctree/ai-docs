@@ -1,0 +1,72 @@
+<Connection software="etabs" model="Tower.edb" name="ETABS — Modal Analysis Review" requires="Run modal analysis in ETABS">
+<Var name="mode_numbers" table="Modal Participating Mass Ratios" column="Mode" />
+<Var name="periods" table="Modal Participating Mass Ratios" column="Period" />
+<Var name="ux_ratio" table="Modal Participating Mass Ratios" column="UX" />
+<Var name="uy_ratio" table="Modal Participating Mass Ratios" column="UY" />
+<Var name="sum_ux" table="Modal Participating Mass Ratios" column="SumUX" />
+<Var name="sum_uy" table="Modal Participating Mass Ratios" column="SumUY" />
+<Var name="rz_ratio" table="Modal Participating Mass Ratios" column="RZ" />
+<Script>
+```python
+rows = parse_table("Modal Participating Mass Ratios")
+
+fundamental_x = None
+fundamental_y = None
+torsional = None
+
+for r in rows:
+    mode = int(r.get("Mode", 0))
+    period = float(r.get("Period", 0))
+    ux = float(r.get("UX", 0))
+    uy = float(r.get("UY", 0))
+    rz = float(r.get("RZ", 0))
+
+    if ux > 0.5 and fundamental_x is None:
+        fundamental_x = f"Mode {mode}: T={period:.3f}s (UX={ux:.1%})"
+    if uy > 0.5 and fundamental_y is None:
+        fundamental_y = f"Mode {mode}: T={period:.3f}s (UY={uy:.1%})"
+    if rz > 0.5 and torsional is None:
+        torsional = f"Mode {mode}: T={period:.3f}s (RZ={rz:.1%})"
+
+last_row = rows[-1] if rows else {}
+cumulative_ux = float(last_row.get("SumUX", 0))
+cumulative_uy = float(last_row.get("SumUY", 0))
+meets_90_pct = cumulative_ux >= 0.9 and cumulative_uy >= 0.9
+
+modal_summary = f"Fundamental X: {fundamental_x}\nFundamental Y: {fundamental_y}\nTorsional: {torsional}\n90% mass: {'PASS' if meets_90_pct else 'FAIL'} (SumUX={cumulative_ux:.1%}, SumUY={cumulative_uy:.1%})"
+```
+</Script>
+</Connection>
+
+## A5 — Modal Analysis Review
+
+**Category:** ETABS Read-Only | **Tests:** `<Var>` (7 columns) + mode identification logic
+
+Reads mode shapes, periods, and mass participation ratios. Identifies the
+fundamental X, Y, and torsional modes and checks the 90% cumulative mass
+participation requirement.
+
+### What this tests
+
+- 7 `<Var>` tags from the same table
+- Sequential scan with "first match" pattern (fundamental mode detection)
+- Percentage formatting with f-strings
+- Boolean logic for code compliance check
+- Multi-line formatted summary output
+
+### Prerequisites
+
+1. ETABS model with modal analysis case defined and run
+2. Enough modes to capture 90% mass participation in both directions
+
+### Expected behaviour
+
+- `fundamental_x` — e.g. "Mode 1: T=1.234s (UX=72.5%)"
+- `fundamental_y` — e.g. "Mode 2: T=1.089s (UY=68.3%)"
+- `torsional` — e.g. "Mode 3: T=0.892s (RZ=65.1%)"
+- `meets_90_pct` — True/False
+- `modal_summary` — multi-line string with all results
+
+### Verified against
+
+- `ebrahimraeyat/etabs_api/results.py` — `get_xy_period()` function

@@ -1,0 +1,54 @@
+<Connection software="etabs" model="Project.edb" name="ETABS — SDS Combo Update" requires="Ensure seismic load patterns exist in ETABS">
+<Script>
+```python
+new_sds = 0.75  # Updated SDS value
+ev_factor = 0.2 * new_sds  # Vertical seismic per ASCE 7
+
+rows = parse_table("Load Combination Definitions")
+
+updated = 0
+for r in rows:
+    combo_name = r.get("ComboName", "")
+    case_name = r.get("CaseName", "")
+    combo_type = r.get("ComboType", "")
+
+    if "Dead" in case_name and ("EQ" in combo_name or "Seismic" in combo_name):
+        current_sf = float(r.get("ScaleFactor", 1.0))
+        if abs(current_sf) > 0.8:
+            sign = 1 if current_sf > 0 else -1
+            new_sf = sign * (abs(current_sf) + ev_factor) if "+" in combo_name else sign * (abs(current_sf) - ev_factor)
+            updated += 1
+
+sds_summary = f"SDS updated to {new_sds}. Ev = {ev_factor}. {updated} combination factors identified for update."
+```
+</Script>
+</Connection>
+
+## B2 — SDS Combination Update
+
+**Category:** ETABS Write | **Tests:** `<Script>` with `parse_table()` read + conditional write logic
+
+Updates the vertical seismic component (Ev = 0.2*SDS) across all seismic load
+combinations when the design SDS value changes. Reads existing combos, identifies
+Dead load factors in seismic combos, and recalculates.
+
+### What this tests
+
+- `parse_table()` to read existing combo definitions
+- Conditional filtering (combo name contains "EQ" or "Seismic")
+- Sign-preserving factor update logic
+- Read-then-compute pattern (no actual write-back in this version — identifies targets)
+
+### Prerequisites
+
+1. ETABS model with seismic load combinations already defined
+2. Combos must include Dead load as a constituent case
+
+### Expected behaviour
+
+- `sds_summary` — e.g. "SDS updated to 0.75. Ev = 0.15. 8 combination factors identified for update."
+- The script identifies combos that need updating but does not modify them (safe for testing)
+
+### Verified against
+
+- `ebrahimraeyat/etabs_api/database.py` — `write_etabs_table()` for the write-back pattern

@@ -1,0 +1,85 @@
+<Connection software="etabs" model="Building.edb" name="ETABS — Beam Forces to Excel" requires="Run beam design in ETABS. Have an Excel workbook open for output.">
+<Var name="beam_labels" table="Concrete Beam Design Summary" column="UniqueName" />
+<Var name="beam_stories" table="Concrete Beam Design Summary" column="Story" />
+<Var name="beam_top_as" table="Concrete Beam Design Summary" column="AsTopRequired" />
+<Var name="beam_bot_as" table="Concrete Beam Design Summary" column="AsBotRequired" />
+<Var name="beam_shear_as" table="Concrete Beam Design Summary" column="AvRequired" />
+<Script>
+```python
+rows = parse_table("Concrete Beam Design Summary")
+
+beam_design_data = []
+for r in rows:
+    beam_design_data.append({
+        "story": r.get("Story", ""),
+        "label": r.get("UniqueName", ""),
+        "As_top": float(r.get("AsTopRequired", 0)),
+        "As_bot": float(r.get("AsBotRequired", 0)),
+        "Av": float(r.get("AvRequired", 0)),
+    })
+
+beam_design_count = len(beam_design_data)
+beam_design_summary = f"Extracted design data for {beam_design_count} beams ready for Excel export"
+```
+</Script>
+</Connection>
+
+<Connection software="excel" model="BeamDesign.xlsx" name="Excel — Beam Design Output" requires="Open BeamDesign.xlsx with sheets: Summary, Details">
+<Input from="beam_design_count" sheet="Summary" cell="B2" />
+<Input from="beam_design_summary" sheet="Summary" cell="B3" />
+<Script>
+```python
+ws = wb.Worksheets("Details")
+ws.Range("A1").Value2 = "Story"
+ws.Range("B1").Value2 = "Label"
+ws.Range("C1").Value2 = "As Top (mm2)"
+ws.Range("D1").Value2 = "As Bot (mm2)"
+ws.Range("E1").Value2 = "Av (mm2/m)"
+
+for i, beam in enumerate(beam_design_data):
+    row = i + 2
+    ws.Range(f"A{row}").Value2 = beam["story"]
+    ws.Range(f"B{row}").Value2 = beam["label"]
+    ws.Range(f"C{row}").Value2 = beam["As_top"]
+    ws.Range(f"D{row}").Value2 = beam["As_bot"]
+    ws.Range(f"E{row}").Value2 = beam["Av"]
+
+excel_beam_summary = f"Wrote {len(beam_design_data)} beam records to Details sheet"
+```
+</Script>
+</Connection>
+
+## D1 — Beam Design Pipeline (ETABS to Excel)
+
+**Category:** ETABS-to-Excel Pipeline | **Tests:** Two `<Connection>` nodes, `<Var>` + `<Input>` + `<Script>` on both
+
+Reads beam design results from ETABS (reinforcement areas), then writes
+them to a formatted Excel spreadsheet with headers and per-beam rows.
+
+### What this tests
+
+- **Two connection nodes on one page** — ETABS source + Excel destination
+- `<Var>` pulling 5 columns from ETABS design summary
+- `<Input>` pushing CalcTree variables to Excel cells
+- `<Script>` on the Excel connection writing bulk data via COM
+- `wb.Worksheets("...")` + `ws.Range(...).Value2` — Excel COM patterns
+- Cross-connection data flow (ETABS script outputs used by Excel script)
+
+### Prerequisites
+
+1. ETABS model with concrete beam design completed
+2. Excel workbook open with sheets named "Summary" and "Details"
+3. Both ETABS and Excel connections must be established
+
+### Expected behaviour
+
+- ETABS connection populates `beam_design_data`, `beam_design_count`, `beam_design_summary`
+- Excel connection pushes `beam_design_count` to Summary!B2 and `beam_design_summary` to Summary!B3
+- Excel script writes headers + data rows to the Details sheet
+- `excel_beam_summary` — e.g. "Wrote 42 beam records to Details sheet"
+
+### Verified against
+
+- `retug/ETABs/pierCheckv002.py` — pier forces to Excel
+- `keshishianv/ETABS-Python-Codes` — frame forces to Excel
+- `nhniegas/Etabs_Designer` — concrete design results

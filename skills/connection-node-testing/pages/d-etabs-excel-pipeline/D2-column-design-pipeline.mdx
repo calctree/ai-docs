@@ -1,0 +1,75 @@
+<Connection software="etabs" model="Edificio.edb" name="ETABS — Column Internal Forces" requires="Run analysis in ETABS">
+<Var name="col_forces_labels" table="Column Forces" column="UniqueName" />
+<Var name="col_forces_p" table="Column Forces" column="P" />
+<Var name="col_forces_m2" table="Column Forces" column="M2" />
+<Var name="col_forces_m3" table="Column Forces" column="M3" />
+<Var name="col_forces_cases" table="Column Forces" column="OutputCase" />
+<Script>
+```python
+rows = parse_table("Column Forces")
+
+col_envelope = {}
+for r in rows:
+    label = r.get("UniqueName", "")
+    p = abs(float(r.get("P", 0)))
+    m2 = abs(float(r.get("M2", 0)))
+    m3 = abs(float(r.get("M3", 0)))
+
+    if label not in col_envelope or p > col_envelope[label]["P"]:
+        col_envelope[label] = {"P": p, "M2": m2, "M3": m3}
+
+col_force_data = [{"label": k, **v} for k, v in col_envelope.items()]
+col_force_count = len(col_force_data)
+col_force_summary = f"Enveloped forces for {col_force_count} columns"
+```
+</Script>
+</Connection>
+
+<Connection software="excel" model="DisenoColumnas.xlsx" name="Excel — Column Design Sheet" requires="Open DisenoColumnas.xlsx">
+<Input from="col_force_count" sheet="Input" cell="B1" />
+<Script>
+```python
+ws = wb.Worksheets("Input")
+ws.Range("A3").Value2 = "Column"
+ws.Range("B3").Value2 = "Pu (kN)"
+ws.Range("C3").Value2 = "Mu2 (kN.m)"
+ws.Range("D3").Value2 = "Mu3 (kN.m)"
+
+for i, col in enumerate(col_force_data):
+    row = i + 4
+    ws.Range(f"A{row}").Value2 = col["label"]
+    ws.Range(f"B{row}").Value2 = col["P"]
+    ws.Range(f"C{row}").Value2 = col["M2"]
+    ws.Range(f"D{row}").Value2 = col["M3"]
+
+col_excel_summary = f"Wrote {len(col_force_data)} column envelopes to Input sheet"
+```
+</Script>
+</Connection>
+
+## D2 — Column Design Pipeline (ETABS to Excel)
+
+**Category:** ETABS-to-Excel Pipeline | **Tests:** Two connections, envelope logic + Excel write
+
+Reads column internal forces from ETABS, envelopes across all load cases
+to find critical P-M-M demands per column, then writes to an Excel design sheet.
+
+### What this tests
+
+- Two connection nodes (ETABS + Excel) with data flow between them
+- Envelope logic: keep maximum axial load per column across all cases
+- `<Input>` pushing `col_force_count` to Excel cell
+- `<Script>` writing structured data with headers to an Excel worksheet
+- Dict unpacking in list comprehension (`{**v}`)
+
+### Prerequisites
+
+1. ETABS model with analysis completed (gravity + lateral)
+2. "Column Forces" table populated
+3. Excel workbook "DisenoColumnas.xlsx" open with an "Input" sheet
+
+### Expected behaviour
+
+- ETABS: `col_force_data` list of column envelopes, `col_force_count`
+- Excel: Headers in A3:D3, data starting at row 4
+- `col_excel_summary` — e.g. "Wrote 25 column envelopes to Input sheet"

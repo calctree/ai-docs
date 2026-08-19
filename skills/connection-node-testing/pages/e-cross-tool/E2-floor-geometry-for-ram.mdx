@@ -1,0 +1,58 @@
+<Connection software="etabs" model="PTBuilding.edb" name="ETABS — Floor Geometry for RAM" requires="Model must have floor slabs, beams, columns and walls assigned">
+<Var name="slab_props" table="Slab Property Definitions" column="Name" />
+<Var name="slab_thickness" table="Slab Property Definitions" column="SlabThickness" />
+<Var name="area_objects" table="Area Object Connectivity" column="UniqueName" />
+<Var name="area_joints" table="Area Object Connectivity" column="Joint1" />
+<Var name="col_locations" table="Column Object Connectivity" column="UniqueName" />
+<Var name="wall_locations" table="Wall Object Connectivity" column="UniqueName" />
+<Script>
+```python
+slabs = parse_table("Slab Property Definitions")
+areas = parse_table("Area Object Connectivity")
+columns = parse_table("Column Object Connectivity")
+walls = parse_table("Wall Object Connectivity")
+
+floor_data = {
+    "slabs": len(slabs),
+    "area_objects": len(areas),
+    "columns": len(columns),
+    "walls": len(walls),
+}
+
+slab_types = {}
+for s in slabs:
+    name = s.get("Name", "")
+    thick = float(s.get("SlabThickness", 0))
+    slab_types[name] = thick
+
+floor_geometry_summary = f"Floor: {floor_data['area_objects']} area objects, {floor_data['columns']} columns, {floor_data['walls']} walls. Slab types: {slab_types}"
+```
+</Script>
+</Connection>
+
+## E2 — ETABS Floor Geometry for RAM Concept
+
+**Category:** Cross-Tool Transfer | **Tests:** `<Var>` from 4 different tables + multi-table `parse_table()`
+
+Reads floor geometry and element connectivity from ETABS for PT slab design
+in RAM Concept. Extracts slab properties, area objects, columns, and walls.
+
+### What this tests
+
+- `<Var>` tags referencing 4 different ETABS tables simultaneously
+- `parse_table()` called 4 times in one script
+- Property extraction (slab types with thicknesses)
+- Connectivity data (area objects, columns, walls)
+- Dict-formatted summary output
+
+### Prerequisites
+
+1. ETABS model with floor slabs, columns, and walls defined
+2. Slab properties assigned (thickness, material)
+3. No analysis required — reads geometric/assignment data only
+
+### Expected behaviour
+
+- `floor_data` — dict with counts of each element type
+- `slab_types` — dict mapping slab name to thickness
+- `floor_geometry_summary` — e.g. "Floor: 45 area objects, 20 columns, 8 walls. Slab types: {'S200': 0.2, 'S250': 0.25}"
