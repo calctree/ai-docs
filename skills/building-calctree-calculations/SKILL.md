@@ -73,6 +73,10 @@ Three calls, in order:
    back in document order. Reusing the id updates in place — verified no
    duplication, which matters because this upsert never deletes, so a wrong id
    leaves the old statement live and evaluating beside the new one.
+   Because it matches on defined variables it needs the calculation to have
+   evaluated, so it polls until `namedValues` appear (30s default). Called straight
+   after the insert without that wait, every block silently fails to match and you
+   get `titled: 0` — which is how this was found.
 
 For calculation-graph-only writes with no body node, use
 `createOrUpdateCalculation(workspaceId, pageId, statements[])`, where each statement is

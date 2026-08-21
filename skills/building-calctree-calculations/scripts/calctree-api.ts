@@ -331,7 +331,7 @@ export { GRAPH_URL }
 export type MdxBlock = { component: string; name: string; assigns: string[] }
 
 const TITLED_COMPONENTS =
-  'Assignment|EquationBlock|Python|SelectInput|RadioInput|SimpleInput|MatrixBlock|TrafficLights'
+  'Assignment|EquationBlock|Python|SelectInput|RadioInput|SimpleInput|MatrixBlock|TrafficLights|InputTable'
 
 /** Pull `name` plus the variables each block assigns, in document order. */
 export function parseMdxBlocks(mdx: string): MdxBlock[] {
@@ -356,6 +356,10 @@ export function parseMdxBlocks(mdx: string): MdxBlock[] {
       .split('\n')
       .map((l) => /^\s*([A-Za-z_]\w*)\s*=(?!=)/.exec(l)?.[1])
       .filter((v): v is string => Boolean(v))
+    // An <InputTable name="_x"> carries no formula: it imports as a statement
+    // `_x = cttable(...)`, so the name IS the variable it defines. Without this it
+    // has no `assigns`, gets filtered out, and stays "Untitled Statement" on the page.
+    if (component === 'InputTable' && assigns.length === 0) assigns.push(name)
     out.push({ component, name, assigns })
   }
   return out
@@ -371,9 +375,26 @@ export async function applyMdxStatementTitles(
   workspaceId: string,
   pageId: string,
   mdx: string,
+  /** How long to wait for server-side evaluation before giving up (ms). */
+  settleTimeoutMs = 30000,
 ): Promise<{ titled: number; unmatched: string[]; untitledLeft: number }> {
   const blocks = parseMdxBlocks(mdx).filter((b) => b.assigns.length > 0)
-  const ctx = await getPageContext(workspaceId, pageId)
+
+  // Matching is by the variables each statement DEFINES, so it needs namedValues,
+  // which only exist once the calculation has evaluated server-side. Called straight
+  // after insertMDXContent the read comes back with statements but no namedValues,
+  // and every block silently fails to match (titled: 0). Poll until the graph has
+  // evaluated rather than making every caller remember to sleep first.
+  const deadline = Date.now() + settleTimeoutMs
+  let ctx = await getPageContext(workspaceId, pageId)
+  while (
+    Date.now() < deadline &&
+    (ctx.statements.length === 0 ||
+      !ctx.statements.some((s) => (s.namedValues ?? []).some((v) => v.name)))
+  ) {
+    await new Promise((r) => setTimeout(r, 1500))
+    ctx = await getPageContext(workspaceId, pageId)
+  }
   const used = new Set<string>()
   const updates: StatementInput[] = []
 
