@@ -127,8 +127,18 @@ Same engine as the in-app editor:
 - `equalText()` for string comparison, not `==`. Word operators: `and`, `or`, `xor`, `not`.
 - Double-quote strings.
 - **Avoid variable names that collide with unit abbreviations** (`N`, `V`, `Pa`, `M`, `mm`,
-  `m`, `s`, `kg`, `K`, `A`, `g`, `h`, `d`, `J`). Use `M_max`, not `M`. A variable named `mm`
-  shadows the millimetre unit and nulls every later conversion on the page.
+  `m`, `s`, `kg`, `K`, `A`, `g`, `h`, `d`, `J`, `t`, `L`, `W`, `T`, `C`, `F`, `min`). Use
+  `M_max`, not `M`. A variable named `mm` shadows the millimetre unit and nulls every later
+  conversion on the page. `t`, `h` and `d` are the tonne, hour and day, so an age in days is
+  `t_days`, a depth is `h_sec`, an effective depth is `d_eff`.
+- **`phi` is the golden ratio**, not a free name. It is a MathJS constant, so a creep
+  coefficient is `phi_creep` and a bar diameter is `phi_bar`. `e`, `i`, `pi` and `tau` are
+  likewise taken.
+- **Use one spelling per quantity across every page in a library.** A cross-page reference
+  binds by NAME, so `bw` on one page and `b_sec` on another are two unrelated variables as far
+  as the platform is concerned: the wiring silently fails to connect, or connects to the wrong
+  thing. Agree the spelling once, before the pages exist — renaming later means rebuilding every
+  page that used the old name, because content cannot be edited in place (see gotchas).
 - Within one `multiline_mathjs` formula, define a variable before using it. Across separate
   statements order does not matter: it is a dependency graph.
 
@@ -233,6 +243,27 @@ A cross-page reference is a snapshot of the source page's computed values, creat
 `multiline_mathjs` statement whose object carries a metadata key alongside the values. That
 metadata key is what makes it a source-linked page reference rather than a plain block.
 Summary and roll-up pages should **reference** upstream results, not recompute them.
+
+### Structuring a library of calculations
+
+Calculation pages fall into three layers, and knowing which one you are writing decides what
+belongs on the page:
+
+| Layer | Shape | Example | Has a pass/fail? |
+|---|---|---|---|
+| **Property** | pure function of specified values | material design properties from a characteristic strength | No |
+| **Check** | demand + geometry + properties -> capacity and utilisation | a shear or crack-width check | Yes, one named boolean |
+| **Design task** | runs many checks over one geometry, reports the governing one | designing a member | Yes, the governing check |
+
+Two consequences worth planning for:
+
+- **A property page is a leaf.** Every input is a specified value, so nothing upstream feeds it
+  and it needs no traffic light — the only chip that belongs on one is an *applicability* guard
+  ("is this input within the scope of the clause"), not a design check.
+- **Check pages should consume property pages, not re-derive them.** The common failure is for
+  every check in a library to ask the user for the same characteristic strengths and partial
+  factors and recompute the same design values internally. It works, and it means a change to a
+  material rule has to be made in as many places as you have checks.
 
 ## 10. Gotchas worth knowing before you start
 
