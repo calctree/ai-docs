@@ -18,8 +18,6 @@ The primitives implement everything below. Prefer running them over re-writing t
 - `scripts/calctree-api.ts` — page creation with tree registration, MDX insert, calculation
   writes, page-context reads, cross-page references. **Read as reference** when you need the
   exact GraphQL shape; **import and call** when driving.
-- `scripts/auth.ts` — `ensureBearer()`. Requires `CALCTREE_LOGIN_EMAIL` and
-  `CALCTREE_LOGIN_PASSWORD`, or a pre-set `CALCTREE_BEARER`.
 - `examples/smoke-two-page.ts` — **run this first** to confirm your credentials and endpoint
   work end to end. It creates two linked pages, reads the computed values back, and prints the
   page URLs:
@@ -30,27 +28,30 @@ The primitives implement everything below. Prefer running them over re-writing t
 
 Requires `tsx` (or any TypeScript-aware runner). No other dependencies.
 
-## 1. Auth: use Bearer, not an API key
+## 1. Auth: one API key
 
-Endpoint: `https://graph.calctree.com/graphql`, header `Authorization: Bearer <jwt>`.
+Endpoint: `https://graph.calctree.com/graphql`, header `x-api-key: <your key>`. That single
+key covers everything in this skill — reads, page creation, content writes, calculation
+writes. Set it as `CALCTREE_API_KEY`.
 
-Mint a token with `POST https://api.calctree.com/api/auth/login` with `{email, password}`,
-which returns `{accessToken}`.
+Verified 2026-08-21 against the live API on every write path here: `insertMDXContent` with
+`<Assignment>`, `<EquationBlock>` and `<Python>` blocks, and `createOrUpdateCalculation`
+directly. All persist their formulas and evaluate server-side under the API key alone.
 
-**Do not use `x-api-key` for content writes.** The API key does not carry through to the
-calculation service, so `insertMDXContent` creates the body node while the statement is
-rejected: you get a page that looks correct with empty calculation blocks and no error.
-Bearer creates the node and the statement together.
+Two things to know:
 
-This is a known platform limitation rather than the intended design. When it is fixed, the API
-key becomes the normal path for every call and this section changes accordingly. Until then, the API key is
-fine for reads and for every other mutation; only `insertMDXContent` and
-`createOrUpdateCalculation` need a login-minted Bearer. Either way, **check the response**: a
-write that returns zero created statements has failed, whatever the HTTP status says.
+- **An invalid or empty key does not announce itself.** A bad key comes back as a GraphQL
+  `"Unexpected error."` on the first mutation, with no 401 and no mention of auth. If you see
+  that, check the key before you debug anything else.
+- **Check the response body, not the HTTP status.** A content write returns
+  `statementsCreated`; if that is zero when you sent formulas, the write failed whatever the
+  status says.
+
+Statements do not need a user id attached. The key identifies the account on its own.
 
 ## 2. The write path
 
-Two calls, in order:
+Three calls, in order:
 
 1. **Create the page and register it in the page tree.** Both are required. A page that
    exists but is not in the tree is orphaned and invisible in the UI. Client-minted ids are
@@ -58,6 +59,25 @@ Two calls, in order:
 2. **`insertMDXContent(workspaceId, pageId, mdx, position)`** returns
    `{insertedCount, statementsCreated}`. Prose and inline calculation blocks both go through
    here. Always check `statementsCreated` matches what you sent.
+
+3. **`applyMdxStatementTitles(workspaceId, pageId, mdx)`** — set the statement
+   titles, which step 2 does not do. `insertMDXContent` sends the MDX `name`
+   attribute to the document node but not to the calculation graph, so every
+   statement comes back titled "Untitled Statement". Verified 2026-08-21 against
+   all four naming forms (`<Assignment name>`, `<EquationBlock name formula="...">`,
+   the canonical `<EquationBlock name>` plus fenced block, and `<Python name>`) —
+   every one lost the title, so this is not a quirk of the older attribute form.
+   The values are unaffected; the cost is presentational, and it is what makes a
+   Python node read as "Untitled". The helper re-upserts each statement with the
+   SAME `statementId` plus its title, matching statements to MDX blocks by the
+   variables they define rather than by order, because the graph does not come
+   back in document order. Reusing the id updates in place — verified no
+   duplication, which matters because this upsert never deletes, so a wrong id
+   leaves the old statement live and evaluating beside the new one.
+   Because it matches on defined variables it needs the calculation to have
+   evaluated, so it polls until `namedValues` appear (30s default). Called straight
+   after the insert without that wait, every block silently fails to match and you
+   get `titled: 0` — which is how this was found.
 
 For calculation-graph-only writes with no body node, use
 `createOrUpdateCalculation(workspaceId, pageId, statements[])`, where each statement is
@@ -108,8 +128,18 @@ Same engine as the in-app editor:
 - `equalText()` for string comparison, not `==`. Word operators: `and`, `or`, `xor`, `not`.
 - Double-quote strings.
 - **Avoid variable names that collide with unit abbreviations** (`N`, `V`, `Pa`, `M`, `mm`,
-  `m`, `s`, `kg`, `K`, `A`, `g`, `h`, `d`, `J`). Use `M_max`, not `M`. A variable named `mm`
-  shadows the millimetre unit and nulls every later conversion on the page.
+  `m`, `s`, `kg`, `K`, `A`, `g`, `h`, `d`, `J`, `t`, `L`, `W`, `T`, `C`, `F`, `min`). Use
+  `M_max`, not `M`. A variable named `mm` shadows the millimetre unit and nulls every later
+  conversion on the page. `t`, `h` and `d` are the tonne, hour and day, so an age in days is
+  `t_days`, a depth is `h_sec`, an effective depth is `d_eff`.
+- **`phi` is the golden ratio**, not a free name. It is a MathJS constant, so a creep
+  coefficient is `phi_creep` and a bar diameter is `phi_bar`. `e`, `i`, `pi` and `tau` are
+  likewise taken.
+- **Use one spelling per quantity across every page in a library.** A cross-page reference
+  binds by NAME, so `bw` on one page and `b_sec` on another are two unrelated variables as far
+  as the platform is concerned: the wiring silently fails to connect, or connects to the wrong
+  thing. Agree the spelling once, before the pages exist — renaming later means rebuilding every
+  page that used the old name, because content cannot be edited in place (see gotchas).
 - Within one `multiline_mathjs` formula, define a variable before using it. Across separate
   statements order does not matter: it is a dependency graph.
 
@@ -129,8 +159,14 @@ bite:
   `check = util <= 1 ? "PASS" : "FAIL"` is always truthy, so a traffic-light chip renders
   green whatever the result. Write `within_limits = util <= 1` and name the variable so it
   reads as the verdict.
-- **Mentions are display-only.** Do the rounding in MathJS and treat the mention as a
-  read-out. A mention of a variable the page never defines renders as the word `undefined`
+- **Mentions are display-only, and carry no formatting attributes.** Do the rounding in
+  MathJS. Put no `format` and no `decimal` on a mention: `format` is dropped on import,
+  and `decimal` without it renders the value at 0 decimal places, so `1.08` with
+  `decimal="2"` prints `1` and `0.05` with `decimal="4"` prints `0` — a wrong number, not
+  a formatting nit. A bare mention of a rounded value renders exactly as rounded.
+- **A name-only mention (`showValue="false"`) is a block element.** Never wrap one in
+  text: `Yield strength (<Mention .../>)` renders as three lines with a stranded `)`.
+  Give the symbol its own table column, and use inline LaTeX for notation in prose. A mention of a variable the page never defines renders as the word `undefined`
   and no check will catch it, so every mention key must resolve. Text placed immediately
   after a mention inside a table cell is dropped: put the unit in a separate column.
 - **Charts** need four things together or you get an untitled node and no image: a named
@@ -209,6 +245,27 @@ A cross-page reference is a snapshot of the source page's computed values, creat
 metadata key is what makes it a source-linked page reference rather than a plain block.
 Summary and roll-up pages should **reference** upstream results, not recompute them.
 
+### Structuring a library of calculations
+
+Calculation pages fall into three layers, and knowing which one you are writing decides what
+belongs on the page:
+
+| Layer | Shape | Example | Has a pass/fail? |
+|---|---|---|---|
+| **Property** | pure function of specified values | material design properties from a characteristic strength | No |
+| **Check** | demand + geometry + properties -> capacity and utilisation | a shear or crack-width check | Yes, one named boolean |
+| **Design task** | runs many checks over one geometry, reports the governing one | designing a member | Yes, the governing check |
+
+Two consequences worth planning for:
+
+- **A property page is a leaf.** Every input is a specified value, so nothing upstream feeds it
+  and it needs no traffic light — the only chip that belongs on one is an *applicability* guard
+  ("is this input within the scope of the clause"), not a design check.
+- **Check pages should consume property pages, not re-derive them.** The common failure is for
+  every check in a library to ask the user for the same characteristic strengths and partial
+  factors and recompute the same design values internally. It works, and it means a change to a
+  material rule has to be made in as many places as you have checks.
+
 ## 10. Gotchas worth knowing before you start
 
 - Deleting a page is a **soft** delete. Trashed pages still come back from the pages query
@@ -221,3 +278,9 @@ Summary and roll-up pages should **reference** upstream results, not recompute t
   pages and visible on others.
 - A traffic light must sit one hop from the block that computes its input. A chip whose
   formula reads a variable derived in a later block resolves to null.
+- `insertMDXContent` does create the calculation statements — a separate
+  `createOrUpdateCalculation` is not needed to make a page compute — but it does not
+  set their titles. See section 2, step 3.
+- Client-minted UUIDs are accepted for page and statement ids, so pages you create
+  this way have UUID ids while platform-created pages have 21-character nanoids.
+  Nothing depends on the shape, but it is how you tell them apart in a workspace.

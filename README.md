@@ -12,7 +12,6 @@ blocks; the blocks form a **calculation graph** that evaluates server-side with 
 skills/building-calctree-calculations/
   SKILL.md                    the skill: read this first
   scripts/calctree-api.ts     pages, MDX content, calculations, page references
-  scripts/auth.ts             Bearer token minting
   examples/                   end-to-end example
 evals/                        three evaluation scenarios
 llms.txt                      machine-readable index
@@ -21,25 +20,23 @@ llms.txt                      machine-readable index
 ## Quick start
 
 ```bash
-export CALCTREE_LOGIN_EMAIL=you@example.com
-export CALCTREE_LOGIN_PASSWORD=...
+export CALCTREE_API_KEY=...
 npx tsx skills/building-calctree-calculations/examples/smoke-two-page.ts <workspaceId>
 ```
 
 Three things that catch everyone out, all covered in the skill:
 
-1. **Use `Authorization: Bearer <jwt>` for content writes.** Under `x-api-key` the body node
-   is created but the calculation statement is rejected, so the page looks correct and does
-   not compute, with no error.
-2. **A page must be registered in the page tree.** A page that exists but is not in the tree
+1. **A page must be registered in the page tree.** A page that exists but is not in the tree
    is orphaned and invisible.
-3. **Evaluation is asynchronous.** Settle about two seconds after a write before reading, or
+2. **Evaluation is asynchronous.** Settle about two seconds after a write before reading, or
    you may read zero statements.
+3. **An invalid API key does not say so.** It comes back as a GraphQL `"Unexpected error."`
+   with no 401 and no mention of auth.
 
 ## Status
 
 This repo replaced an earlier set of API docs that had drifted for nine months. The previous
-content was removed rather than edited, because its quick start taught the authentication
-path that silently drops formulas. It remains in git history.
+content was removed rather than edited, because its quick start taught an authentication
+path that silently dropped formulas. It remains in git history.
 
 `PRE-PUBLIC-CHECKLIST.md` lists what must be true before this repo is published again.

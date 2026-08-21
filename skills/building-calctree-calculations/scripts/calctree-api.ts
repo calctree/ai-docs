@@ -1,40 +1,24 @@
 /**
- * Tier-1 CalcTree driving primitives: everything reachable over the production
- * GraphQL mesh with an `x-api-key` (no browser). Query/mutation shapes copied
- * verbatim from pages/services/page-service (pageContextClient.ts + schema.graphql)
- * so this exercises PR #264's exact read path.
+ * CalcTree driving primitives: page creation, MDX content, calculation writes,
+ * page-context reads and cross-page references, all over the public GraphQL
+ * endpoint with an API key. No browser required.
  *
- * Browser-only ops (add/eval a statement, cross-page reference snapshot) are NOT
- * here — they live in the Playwright layer (Tier 2).
- *
- * Env: CALCTREE_API_KEY (required), CALCTREE_GRAPH_URL (default prod mesh).
+ * Env: CALCTREE_API_KEY (required), CALCTREE_GRAPH_URL (defaults to production).
  */
 const GRAPH_URL = process.env.CALCTREE_GRAPH_URL || 'https://graph.calctree.com/graphql'
-const LATEST_REVISION_ID = 'ffffffffff'
+// '~' is the canonical latest-revision sentinel (REVISION_INFINITE in
+// calculations/packages/common/src/types.ts) and is correct because '~' sorts above every
+// base62 character, so it always means "latest". Verified 2026-08-21 that the public gateway
+// accepts it. The hex values in circulation ('fffffff', 'ffffffff', 'ffffffffff') also answer
+// today, but only because no revision id has yet sorted above them: a KSUID beginning with any
+// letter after 'f' silently stops matching. Do not go back to a hex value.
+const LATEST_REVISION_ID = '~'
 
-/**
- * Auth: prefer a Bearer user token (CALCTREE_BEARER) over x-api-key. Bearer is
- * REQUIRED for body-rendered calcs — under x-api-key, insertMDXContent's forwarded
- * key is rejected by the calc-service so MDX-embedded formulas silently drop.
- */
+/** One API key covers reads, page creation and content/calculation writes. */
 function authHeaders(): Record<string, string> {
-  const bearer = process.env.CALCTREE_BEARER
-  if (bearer) return { Authorization: `Bearer ${bearer}` }
   const k = process.env.CALCTREE_API_KEY
-  if (k) return { 'x-api-key': k }
-  throw new Error('Set CALCTREE_BEARER (preferred) or CALCTREE_API_KEY')
-}
-
-/** Mint a Bearer access token via the monolith auth endpoint. `apiBase` e.g. https://api.calctree.com/api */
-export async function login(apiBase: string, email: string, password: string): Promise<string> {
-  const res = await fetch(`${apiBase.replace(/\/$/, '')}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  const j = (await res.json().catch(() => ({}))) as { accessToken?: string; message?: string }
-  if (!j.accessToken) throw new Error(`login failed (HTTP ${res.status}): ${j.message ?? JSON.stringify(j).slice(0, 160)}`)
-  return j.accessToken
+  if (!k) throw new Error('Set CALCTREE_API_KEY')
+  return { 'x-api-key': k }
 }
 
 async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
@@ -44,7 +28,15 @@ async function gql<T>(query: string, variables: Record<string, unknown>): Promis
     body: JSON.stringify({ query, variables }),
   })
   const json = (await res.json()) as { data?: T; errors?: { message: string }[] }
-  if (json.errors?.length) throw new Error(`GraphQL: ${json.errors.map((e) => e.message).join('; ')}`)
+  if (json.errors?.length) {
+    const msg = json.errors.map((e) => e.message).join('; ')
+    // An invalid or empty API key surfaces as a bare "Unexpected error." with no 401
+    // and no mention of auth, so name the likely cause rather than pass it through.
+    if (/unexpected error/i.test(msg)) {
+      throw new Error(`GraphQL: ${msg} — this is what an invalid or empty CALCTREE_API_KEY looks like; check the key first.`)
+    }
+    throw new Error(`GraphQL: ${msg}`)
+  }
   if (!json.data) throw new Error(`No data (HTTP ${res.status})`)
   return json.data
 }
@@ -54,7 +46,7 @@ export function newId(): string {
   return crypto.randomUUID()
 }
 
-// ---- READ (PR #264 path) ----
+// ---- READ ----
 
 export type WorkspacePage = { id: string; title: string }
 export async function listWorkspacePages(workspaceId: string): Promise<WorkspacePage[]> {
@@ -154,10 +146,12 @@ export async function createPageInTree(
  * (the prod system prompt is built to produce exactly this).
  *
  * NOTE: `createOrUpdateCalculation` below writes ONLY the calculation graph (no
- * page body). Use putInitialPageContent for a real, rendered page. Whether MDX
- * calc components here ALSO register statements in the calc graph (making a
- * separate createOrUpdateCalculation unnecessary) is to be confirmed on first
- * live run.
+ * page body). Use putInitialPageContent for a real, rendered page.
+ *
+ * CONFIRMED 2026-08-21 on a live run under an API key: MDX calc components inserted
+ * this way DO register statements in the calculation graph and evaluate server-side,
+ * so a separate createOrUpdateCalculation is not needed to make a page compute. What
+ * it IS needed for is statement titles — see applyMdxStatementTitles.
  */
 export async function putInitialPageContent(
   workspaceId: string,
@@ -212,7 +206,7 @@ export async function pageMDX(workspaceId: string, pageId: string): Promise<stri
   return d.pageMDX
 }
 
-// ---- CALCULATIONS (calc graph only — same path as push_awatif.ts) ----
+// ---- CALCULATIONS (calc graph only, no page body) ----
 
 export type StatementInput = {
   statementId?: string
@@ -260,17 +254,13 @@ function valueToMathjsSource(raw: unknown): string {
 }
 
 /**
- * API-native reproduction of PR #266's `referencePage`: read the source page's
- * current named values and write them onto the target page as a point-in-time
- * `multiline_mathjs` snapshot `alias = { name: <mathjs value>, ... }` via
- * createOrUpdateCalculation (formulas MUST go through the calc engine, never
- * insertMDXContent — under x-api-key the MDX path silently drops formulas).
+ * Cross-page reference: read the source page's current named values and write them
+ * onto the target page as a point-in-time `multiline_mathjs` snapshot,
+ * `alias = { name: <mathjs value>, ... }`, via createOrUpdateCalculation.
  *
  * Values are re-serialized to mathjs source (Unit -> "8 m") so downstream formulas
- * can use them. This bypasses the frontend's @calctree/mathjs serializer, so it is
- * faithful for numeric/unit values and best-effort for exotic types. To test #266's
- * ACTUAL frontend path (createPageCalculationImport), drive the tim/ctp-4117 FE via
- * Playwright instead.
+ * can use them, which is faithful for numeric and unit values and best-effort for
+ * exotic types.
  */
 export async function referencePageViaApi(
   workspaceId: string,
@@ -299,3 +289,117 @@ export async function referencePageViaApi(
 }
 
 export { GRAPH_URL }
+
+// ---- STATEMENT TITLES (insertMDXContent does not carry MDX `name` through) ----
+
+/**
+ * `insertMDXContent` creates the statement but leaves its title "Untitled
+ * Statement": the MDX `name` attribute reaches the document node, not the
+ * calculation graph. Verified 2026-08-21 against all four naming forms
+ * (`<Assignment name>`, `<EquationBlock name formula="...">`, the canonical
+ * `<EquationBlock name>` + fenced block, and `<Python name>`) — every one came
+ * back untitled, so this is not a quirk of the older attribute form.
+ *
+ * Untitled statements compute correctly; the cost is presentational (the drawer,
+ * the statement list, and anything reading a node's name).
+ *
+ * The fix is a third call: re-upsert each statement with the SAME statementId
+ * plus the title. Reusing the id updates in place — verified no duplication,
+ * which matters because this upsert never deletes, so a wrong id would leave the
+ * old statement live and evaluating alongside the new one.
+ */
+export type MdxBlock = { component: string; name: string; assigns: string[] }
+
+const TITLED_COMPONENTS =
+  'Assignment|EquationBlock|Python|SelectInput|RadioInput|SimpleInput|MatrixBlock|TrafficLights|InputTable'
+
+/** Pull `name` plus the variables each block assigns, in document order. */
+export function parseMdxBlocks(mdx: string): MdxBlock[] {
+  const re = new RegExp(
+    `<(${TITLED_COMPONENTS})\\b([\\s\\S]*?)(?:\\/>|>([\\s\\S]*?)<\\/\\1>)`,
+    'g',
+  )
+  const out: MdxBlock[] = []
+  for (const m of mdx.matchAll(re)) {
+    const [, component, attrs = '', inner = ''] = m
+    const name = /\bname\s*=\s*"([^"]*)"/.exec(attrs)?.[1]
+    if (!name) continue
+    // formula can be an attribute (entity-encoded newlines) or a fenced block inside
+    const attrFormula = /\bformula\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(attrs)
+    const fenced = /```[a-z]*\n([\s\S]*?)```/.exec(inner)
+    const src = (attrFormula?.[1] ?? attrFormula?.[2] ?? fenced?.[1] ?? '')
+      .replace(/&#10;/g, '\n')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+    const assigns = src
+      .split('\n')
+      .map((l) => /^\s*([A-Za-z_]\w*)\s*=(?!=)/.exec(l)?.[1])
+      .filter((v): v is string => Boolean(v))
+    // An <InputTable name="_x"> carries no formula: it imports as a statement
+    // `_x = cttable(...)`, so the name IS the variable it defines. Without this it
+    // has no `assigns`, gets filtered out, and stays "Untitled Statement" on the page.
+    if (component === 'InputTable' && assigns.length === 0) assigns.push(name)
+    out.push({ component, name, assigns })
+  }
+  return out
+}
+
+/**
+ * Set statement titles on a page from the `name` attributes in the MDX that
+ * built it. Statements are matched to blocks by which variables they define,
+ * not by order, because the calculation graph does not come back in document
+ * order. Call it after `insertMDXContent` has settled.
+ */
+export async function applyMdxStatementTitles(
+  workspaceId: string,
+  pageId: string,
+  mdx: string,
+  /** How long to wait for server-side evaluation before giving up (ms). */
+  settleTimeoutMs = 30000,
+): Promise<{ titled: number; unmatched: string[]; untitledLeft: number }> {
+  const blocks = parseMdxBlocks(mdx).filter((b) => b.assigns.length > 0)
+
+  // Matching is by the variables each statement DEFINES, so it needs namedValues,
+  // which only exist once the calculation has evaluated server-side. Called straight
+  // after insertMDXContent the read comes back with statements but no namedValues,
+  // and every block silently fails to match (titled: 0). Poll until the graph has
+  // evaluated rather than making every caller remember to sleep first.
+  const deadline = Date.now() + settleTimeoutMs
+  let ctx = await getPageContext(workspaceId, pageId)
+  while (
+    Date.now() < deadline &&
+    (ctx.statements.length === 0 ||
+      !ctx.statements.some((s) => (s.namedValues ?? []).some((v) => v.name)))
+  ) {
+    await new Promise((r) => setTimeout(r, 1500))
+    ctx = await getPageContext(workspaceId, pageId)
+  }
+  const used = new Set<string>()
+  const updates: StatementInput[] = []
+
+  for (const s of ctx.statements) {
+    const names = new Set((s.namedValues ?? []).map((v) => v.name).filter(Boolean) as string[])
+    let best: { block: MdxBlock; score: number } | null = null
+    for (const block of blocks) {
+      if (used.has(block.name)) continue
+      const score = block.assigns.filter((a) => names.has(a)).length
+      if (score > 0 && (!best || score > best.score)) best = { block, score }
+    }
+    if (!best) continue
+    used.add(best.block.name)
+    updates.push({
+      statementId: s.statementId,
+      title: best.block.name,
+      formula: s.formula,
+      engine: s.engine,
+    })
+  }
+
+  if (updates.length) await createOrUpdateCalculation(workspaceId, pageId, updates)
+  return {
+    titled: updates.length,
+    unmatched: blocks.filter((b) => !used.has(b.name)).map((b) => b.name),
+    untitledLeft: ctx.statements.length - updates.length,
+  }
+}

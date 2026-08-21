@@ -1,25 +1,26 @@
 /**
- * Two-page smoke test against a SANDBOX workspace. Proves the Tier-1 driving
- * layer end-to-end AND exercises the cross-page read/reference path (PRs #264/#266):
+ * Two-page smoke test against a SANDBOX workspace. Run this first to confirm your
+ * key and endpoint work end to end:
  *   1. create page A (+tree), give it inputs + a derived result
- *   2. read A back (getPageContext) — does an API-created calc evaluate server-side?
+ *   2. read A back (getPageContext) and confirm it evaluated server-side
  *   3. create page B (+tree)
- *   4. reference A into B (API-native snapshot of A's values)
+ *   4. reference A into B (a snapshot of A's values)
  *   5. read B back, print everything + the /edit URLs
  *
- * Usage: CALCTREE_API_KEY=... tsx harness/smoke-two-page.ts <workspaceId>
+ * It creates two real pages, so point it at a workspace you do not mind writing to.
+ *
+ * Usage: CALCTREE_API_KEY=... npx tsx examples/smoke-two-page.ts <workspaceId>
  */
 import {
   createPageInTree, insertMDXContent, getPageContext, referencePageViaApi,
-} from './calctree-api.ts'
-import { ensureBearer } from './auth.ts'
+} from '../scripts/calctree-api.ts'
 
 const ws = process.argv[2]
-if (!ws) { console.error('usage: tsx harness/smoke-two-page.ts <workspaceId>'); process.exit(1) }
+if (!ws) { console.error('usage: npx tsx examples/smoke-two-page.ts <workspaceId>'); process.exit(1) }
+if (!process.env.CALCTREE_API_KEY) { console.error('set CALCTREE_API_KEY'); process.exit(1) }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-await ensureBearer()
-console.log('authenticated (Bearer)\n')
+console.log('using CALCTREE_API_KEY\n')
 const url = (id: string) => `https://app.calctree.com/edit/${ws}/${id}`
 const fmtVal = (raw: unknown): string => {
   let v: unknown = raw
@@ -41,8 +42,8 @@ const show = (label: string, ctx: Awaited<ReturnType<typeof getPageContext>>) =>
 // 1. Page A with inputs + derived result
 const A = await createPageInTree(ws, 'Smoke A — inputs')
 console.log(`created A: ${url(A.id)}`)
-// Bearer path: prose AND formula go through insertMDXContent. The EquationBlock carries
-// the formula, so the body node + persisted statement are created together (renders + computes).
+// Prose AND formula both go through insertMDXContent. The EquationBlock carries the
+// formula, so the body node and the persisted statement are created together.
 // No leading '#' — the page title already renders as the H1.
 const mdxA = [
   'Simply-supported beam: UDL over a clear span, mid-span moment.', '',
