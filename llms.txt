@@ -11,8 +11,9 @@ calculation pages, and it supersedes any older CalcTree API documentation.
 
 ## Working code
 
-- [Primitives](skills/building-calctree-calculations/scripts/calctree-api.ts): page creation with tree registration, MDX content insert, calculation writes, page context reads, cross-page references.
-- [End-to-end example](skills/building-calctree-calculations/examples/smoke-two-page.ts): creates two linked pages and reads the computed values back.
+- [Primitives](skills/building-calctree-calculations/scripts/calctree_api.py): page creation with tree registration, MDX content insert, calculation writes, page context reads, cross-page references. Standard library only, importable or a CLI.
+- [GraphQL reference](skills/building-calctree-calculations/REFERENCE.md): every operation with its variables and response shape, for driving the API without running our code.
+- [End-to-end example](skills/building-calctree-calculations/examples/smoke_two_page.py): creates two linked pages and reads the computed values back.
 
 ## Notes
 

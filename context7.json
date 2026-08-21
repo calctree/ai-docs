@@ -6,11 +6,11 @@
     "skills"
   ],
   "excludeFolders": [
-    "archive",
-    ".claude"
+    "dist",
+    "tools"
   ],
   "rules": [
-    "Read skills/building-calctree-calculations/SKILL.md first: it is verified against the live API and supersedes any older CalcTree documentation",
+    "Read skills/building-calctree-calculations/SKILL.md first, and REFERENCE.md for the exact GraphQL documents: it is verified against the live API and supersedes any older CalcTree documentation",
     "One 'x-api-key' header covers everything: reads, page creation, insertMDXContent and createOrUpdateCalculation. Verified live 2026-08-21 across <Assignment>, <EquationBlock> and <Python> writes",
     "An invalid or empty API key surfaces as a GraphQL 'Unexpected error.' with no 401 and no mention of auth: check the key before debugging anything else",
     "Creating a page takes two steps: create it, then register it in the page tree. A page that exists but is not in the tree is orphaned and invisible",
@@ -32,6 +32,7 @@
     "Only use Python libraries pre-installed in the CalcTree environment: see the Python section of the skill",
     "Deleting a page is a soft delete: trashed pages still return from the pages query",
     "In-place content edits cannot remove or reorder body nodes, and leave old statements behind so variables end up defined twice and the page nulls out. To replace content, delete the page and re-create it",
-    "Page URLs follow the format https://app.calctree.com/edit/{workspaceId}/{pageId}"
+    "Page URLs follow the format https://app.calctree.com/edit/{workspaceId}/{pageId}",
+    "insertMDXContent does not set statement titles, so a third call re-upserts each statement with the SAME statementId plus its title. The ids are not stable straight after the insert: upserting against a stale id is a silent no-op that leaves the page permanently untitled, so read the ids, upsert, then read back and confirm the titles are visible, and retry with fresh ids if they are not"
   ]
 }

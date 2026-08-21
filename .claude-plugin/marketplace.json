@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "calctree",
+  "description": "CalcTree skills for driving engineering calculation pages from an AI agent",
+  "owner": { "name": "CalcTree", "url": "https://www.calctree.com" },
+  "plugins": [
+    {
+      "name": "calctree",
+      "source": "./",
+      "description": "Build and read CalcTree engineering calculation pages programmatically via the GraphQL API.",
+      "category": "engineering",
+      "tags": ["calctree", "calculations", "engineering", "graphql"]
+    }
+  ]
+}
