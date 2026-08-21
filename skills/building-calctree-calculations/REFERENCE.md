@@ -14,6 +14,16 @@ One API key covers every call below. An invalid or empty key comes back as a bar
 `"Unexpected error."` with no 401 and no mention of auth — if you see that, check
 the key before debugging anything else.
 
+## Contents
+
+- The write path, in order
+- Ids
+- Reads: `pages`, `page` + `pageContent`, `calculation`, `pageMDX`
+- Writes: `createPageSync`, `addPageNode`, `insertMDXContent`, `createOrUpdateCalculation`, `deletePage`
+- Statement titles, and the two traps
+- Cross-page references
+- In-place edits
+
 ## The write path, in order
 
 Creating a page that renders and computes is three calls. All three are required.

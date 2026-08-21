@@ -1,6 +1,6 @@
 ---
 name: building-calctree-calculations
-description: Build and read CalcTree calculation pages programmatically via the GraphQL API. Use when creating engineering calculations, inserting MDX content with live formulas, reading computed values back, or linking pages together. Covers auth, the write path, MathJS and Python statements, and the rules that silently break pages.
+description: Builds and reads CalcTree calculation pages programmatically via the GraphQL API. Use when creating engineering calculations, inserting MDX content with live formulas, reading computed values back, or linking pages together. Covers auth, the write path, MathJS and Python statements, and the rules that silently break pages.
 ---
 
 # CalcTree
