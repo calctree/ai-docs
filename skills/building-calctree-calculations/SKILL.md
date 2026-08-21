@@ -148,8 +148,14 @@ bite:
   `check = util <= 1 ? "PASS" : "FAIL"` is always truthy, so a traffic-light chip renders
   green whatever the result. Write `within_limits = util <= 1` and name the variable so it
   reads as the verdict.
-- **Mentions are display-only.** Do the rounding in MathJS and treat the mention as a
-  read-out. A mention of a variable the page never defines renders as the word `undefined`
+- **Mentions are display-only, and carry no formatting attributes.** Do the rounding in
+  MathJS. Put no `format` and no `decimal` on a mention: `format` is dropped on import,
+  and `decimal` without it renders the value at 0 decimal places, so `1.08` with
+  `decimal="2"` prints `1` and `0.05` with `decimal="4"` prints `0` — a wrong number, not
+  a formatting nit. A bare mention of a rounded value renders exactly as rounded.
+- **A name-only mention (`showValue="false"`) is a block element.** Never wrap one in
+  text: `Yield strength (<Mention .../>)` renders as three lines with a stranded `)`.
+  Give the symbol its own table column, and use inline LaTeX for notation in prose. A mention of a variable the page never defines renders as the word `undefined`
   and no check will catch it, so every mention key must resolve. Text placed immediately
   after a mention inside a table cell is dropped: put the unit in a separate column.
 - **Charts** need four things together or you get an untitled node and no image: a named
