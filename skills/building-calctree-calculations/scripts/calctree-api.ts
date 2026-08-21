@@ -7,10 +7,18 @@
  * Browser-only ops (add/eval a statement, cross-page reference snapshot) are NOT
  * here — they live in the Playwright layer (Tier 2).
  *
- * Env: CALCTREE_API_KEY (required), CALCTREE_GRAPH_URL (default prod mesh).
+ * Env: CALCTREE_BEARER or CALCTREE_LOGIN_EMAIL/PASSWORD (required for content
+ * writes — see authHeaders), CALCTREE_API_KEY (reads), CALCTREE_GRAPH_URL
+ * (default prod mesh).
  */
 const GRAPH_URL = process.env.CALCTREE_GRAPH_URL || 'https://graph.calctree.com/graphql'
-const LATEST_REVISION_ID = 'ffffffffff'
+// '~' is the canonical latest-revision sentinel (REVISION_INFINITE in
+// calculations/packages/common/src/types.ts) and is correct because '~' sorts above every
+// base62 character, so it always means "latest". Verified 2026-08-21 that the public gateway
+// accepts it. The hex values in circulation ('fffffff', 'ffffffff', 'ffffffffff') also answer
+// today, but only because no revision id has yet sorted above them: a KSUID beginning with any
+// letter after 'f' silently stops matching. Do not go back to a hex value.
+const LATEST_REVISION_ID = '~'
 
 /**
  * Auth: prefer a Bearer user token (CALCTREE_BEARER) over x-api-key. Bearer is
@@ -154,10 +162,12 @@ export async function createPageInTree(
  * (the prod system prompt is built to produce exactly this).
  *
  * NOTE: `createOrUpdateCalculation` below writes ONLY the calculation graph (no
- * page body). Use putInitialPageContent for a real, rendered page. Whether MDX
- * calc components here ALSO register statements in the calc graph (making a
- * separate createOrUpdateCalculation unnecessary) is to be confirmed on first
- * live run.
+ * page body). Use putInitialPageContent for a real, rendered page.
+ *
+ * CONFIRMED 2026-08-21 on a live run: MDX calc components inserted this way DO
+ * register statements in the calculation graph and evaluate server-side, so a
+ * separate createOrUpdateCalculation is not needed to make a page compute. What
+ * it IS needed for is statement titles — see applyMdxStatementTitles.
  */
 export async function putInitialPageContent(
   workspaceId: string,
@@ -299,3 +309,96 @@ export async function referencePageViaApi(
 }
 
 export { GRAPH_URL }
+
+// ---- STATEMENT TITLES (insertMDXContent does not carry MDX `name` through) ----
+
+/**
+ * `insertMDXContent` creates the statement but leaves its title "Untitled
+ * Statement": the MDX `name` attribute reaches the document node, not the
+ * calculation graph. Verified 2026-08-21 against all four naming forms
+ * (`<Assignment name>`, `<EquationBlock name formula="...">`, the canonical
+ * `<EquationBlock name>` + fenced block, and `<Python name>`) — every one came
+ * back untitled, so this is not a quirk of the older attribute form.
+ *
+ * Untitled statements compute correctly; the cost is presentational (the drawer,
+ * the statement list, and anything reading a node's name).
+ *
+ * The fix is a third call: re-upsert each statement with the SAME statementId
+ * plus the title. Reusing the id updates in place — verified no duplication,
+ * which matters because this upsert never deletes, so a wrong id would leave the
+ * old statement live and evaluating alongside the new one.
+ */
+export type MdxBlock = { component: string; name: string; assigns: string[] }
+
+const TITLED_COMPONENTS =
+  'Assignment|EquationBlock|Python|SelectInput|RadioInput|SimpleInput|MatrixBlock|TrafficLights'
+
+/** Pull `name` plus the variables each block assigns, in document order. */
+export function parseMdxBlocks(mdx: string): MdxBlock[] {
+  const re = new RegExp(
+    `<(${TITLED_COMPONENTS})\\b([\\s\\S]*?)(?:\\/>|>([\\s\\S]*?)<\\/\\1>)`,
+    'g',
+  )
+  const out: MdxBlock[] = []
+  for (const m of mdx.matchAll(re)) {
+    const [, component, attrs = '', inner = ''] = m
+    const name = /\bname\s*=\s*"([^"]*)"/.exec(attrs)?.[1]
+    if (!name) continue
+    // formula can be an attribute (entity-encoded newlines) or a fenced block inside
+    const attrFormula = /\bformula\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(attrs)
+    const fenced = /```[a-z]*\n([\s\S]*?)```/.exec(inner)
+    const src = (attrFormula?.[1] ?? attrFormula?.[2] ?? fenced?.[1] ?? '')
+      .replace(/&#10;/g, '\n')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+    const assigns = src
+      .split('\n')
+      .map((l) => /^\s*([A-Za-z_]\w*)\s*=(?!=)/.exec(l)?.[1])
+      .filter((v): v is string => Boolean(v))
+    out.push({ component, name, assigns })
+  }
+  return out
+}
+
+/**
+ * Set statement titles on a page from the `name` attributes in the MDX that
+ * built it. Statements are matched to blocks by which variables they define,
+ * not by order, because the calculation graph does not come back in document
+ * order. Call it after `insertMDXContent` has settled.
+ */
+export async function applyMdxStatementTitles(
+  workspaceId: string,
+  pageId: string,
+  mdx: string,
+): Promise<{ titled: number; unmatched: string[]; untitledLeft: number }> {
+  const blocks = parseMdxBlocks(mdx).filter((b) => b.assigns.length > 0)
+  const ctx = await getPageContext(workspaceId, pageId)
+  const used = new Set<string>()
+  const updates: StatementInput[] = []
+
+  for (const s of ctx.statements) {
+    const names = new Set((s.namedValues ?? []).map((v) => v.name).filter(Boolean) as string[])
+    let best: { block: MdxBlock; score: number } | null = null
+    for (const block of blocks) {
+      if (used.has(block.name)) continue
+      const score = block.assigns.filter((a) => names.has(a)).length
+      if (score > 0 && (!best || score > best.score)) best = { block, score }
+    }
+    if (!best) continue
+    used.add(best.block.name)
+    updates.push({
+      statementId: s.statementId,
+      title: best.block.name,
+      formula: s.formula,
+      engine: s.engine,
+    })
+  }
+
+  if (updates.length) await createOrUpdateCalculation(workspaceId, pageId, updates)
+  return {
+    titled: updates.length,
+    unmatched: blocks.filter((b) => !used.has(b.name)).map((b) => b.name),
+    untitledLeft: ctx.statements.length - updates.length,
+  }
+}

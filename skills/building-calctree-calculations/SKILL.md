@@ -50,7 +50,7 @@ write that returns zero created statements has failed, whatever the HTTP status 
 
 ## 2. The write path
 
-Two calls, in order:
+Three calls, in order:
 
 1. **Create the page and register it in the page tree.** Both are required. A page that
    exists but is not in the tree is orphaned and invisible in the UI. Client-minted ids are
@@ -58,6 +58,21 @@ Two calls, in order:
 2. **`insertMDXContent(workspaceId, pageId, mdx, position)`** returns
    `{insertedCount, statementsCreated}`. Prose and inline calculation blocks both go through
    here. Always check `statementsCreated` matches what you sent.
+
+3. **`applyMdxStatementTitles(workspaceId, pageId, mdx)`** — set the statement
+   titles, which step 2 does not do. `insertMDXContent` sends the MDX `name`
+   attribute to the document node but not to the calculation graph, so every
+   statement comes back titled "Untitled Statement". Verified 2026-08-21 against
+   all four naming forms (`<Assignment name>`, `<EquationBlock name formula="...">`,
+   the canonical `<EquationBlock name>` plus fenced block, and `<Python name>`) —
+   every one lost the title, so this is not a quirk of the older attribute form.
+   The values are unaffected; the cost is presentational, and it is what makes a
+   Python node read as "Untitled". The helper re-upserts each statement with the
+   SAME `statementId` plus its title, matching statements to MDX blocks by the
+   variables they define rather than by order, because the graph does not come
+   back in document order. Reusing the id updates in place — verified no
+   duplication, which matters because this upsert never deletes, so a wrong id
+   leaves the old statement live and evaluating beside the new one.
 
 For calculation-graph-only writes with no body node, use
 `createOrUpdateCalculation(workspaceId, pageId, statements[])`, where each statement is
@@ -221,3 +236,9 @@ Summary and roll-up pages should **reference** upstream results, not recompute t
   pages and visible on others.
 - A traffic light must sit one hop from the block that computes its input. A chip whose
   formula reads a variable derived in a later block resolves to null.
+- `insertMDXContent` does create the calculation statements — a separate
+  `createOrUpdateCalculation` is not needed to make a page compute — but it does not
+  set their titles. See section 2, step 3.
+- Client-minted UUIDs are accepted for page and statement ids, so pages you create
+  this way have UUID ids while platform-created pages have 21-character nanoids.
+  Nothing depends on the shape, but it is how you tell them apart in a workspace.
