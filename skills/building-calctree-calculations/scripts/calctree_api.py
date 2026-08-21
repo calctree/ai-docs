@@ -488,6 +488,29 @@ def build_page(workspace_id: str, title: str, mdx: str,
             "statements": ctx["statements"], "url": page_url(workspace_id, page["id"])}
 
 
+def audit_untitled(workspace_id: str, page_ids: list[str]) -> dict:
+    """Find pages carrying statements the title pass never set.
+
+    Worth running over anything pushed before 2026-08-21: the earlier TypeScript
+    client upserted titles without confirming them, so a silent no-op against stale
+    statement ids left pages permanently untitled while reporting success.
+    """
+    findings = []
+    for pid in page_ids:
+        ctx = get_page_context(workspace_id, pid)
+        untitled = [st for st in ctx["statements"]
+                    if not st.get("title") or st["title"] == "Untitled Statement"]
+        if untitled:
+            findings.append({
+                "pageId": pid,
+                "title": (ctx.get("page") or {}).get("title"),
+                "untitled": len(untitled),
+                "total": len(ctx["statements"]),
+                "url": page_url(workspace_id, pid),
+            })
+    return {"checked": len(page_ids), "affected": findings}
+
+
 # ---- CLI ----
 
 def _fmt_value(raw) -> str:
@@ -521,6 +544,7 @@ USAGE = """usage: python3 calctree_api.py <command> [args]
   titles      <workspaceId> <pageId> <file.mdx|->
   build       <workspaceId> <title> <file.mdx|->     create + insert + titles + read back
   reference   <workspaceId> <targetPageId> <sourcePageId> [alias]
+  audit       <workspaceId> <pageId>... | -   report statements left "Untitled Statement"
   delete      <workspaceId> <pageId>                 soft delete
 
 '-' reads the MDX from stdin. Requires CALCTREE_API_KEY."""
@@ -575,6 +599,17 @@ def main(argv: list[str]) -> int:
             r = reference_page_via_api(args[0], args[1], args[2],
                                        args[3] if len(args) > 3 else None)
             print(f"alias={r['alias']} values={r['count']} statementId={r['statementId']}")
+        elif cmd == "audit":
+            ids = ([l.strip() for l in sys.stdin if l.strip()]
+                   if args[1:] == ["-"] else args[1:])
+            if not ids:
+                print("audit needs page ids (or '-' to read them from stdin)", file=sys.stderr)
+                return 2
+            r = audit_untitled(args[0], ids)
+            print(f"checked {r['checked']} page(s); {len(r['affected'])} carry untitled statements")
+            for f in r["affected"]:
+                print(f"  {f['untitled']}/{f['total']} untitled  {f['title']!r}\n    {f['url']}")
+            return 1 if r["affected"] else 0
         elif cmd == "delete":
             delete_page(args[0], args[1])
             print("deleted (soft)")

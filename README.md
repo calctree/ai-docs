@@ -21,10 +21,6 @@ evals/                        three evaluation scenarios
 llms.txt                      machine-readable index
 ```
 
-`scripts/calctree-api.ts` and `examples/smoke-two-page.ts` are the older TypeScript
-implementation of the same calls. They are kept only because the calctree-ops template
-pipeline still points at them, they are not part of the distributed skill, and they go once
-that pipeline moves to Python.
 
 ## Quick start
 
