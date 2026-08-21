@@ -53,7 +53,12 @@ def _auth_headers() -> dict[str, str]:
     return {"x-api-key": key}
 
 
-def gql(query: str, variables: dict, timeout: int = 90) -> dict:
+# 90s: a content write with many statements is the slowest call here and has been
+# observed taking tens of seconds; anything past this is a hang, not slowness.
+GQL_TIMEOUT_S = 90
+
+
+def gql(query: str, variables: dict, timeout: int = GQL_TIMEOUT_S) -> dict:
     body = json.dumps({"query": query, "variables": variables}).encode()
     req = urllib.request.Request(
         GRAPH_URL, data=body, method="POST",
@@ -370,9 +375,20 @@ def parse_mdx_blocks(mdx: str) -> list[dict]:
     return out
 
 
+# 30s: server-side evaluation of a page of formulas settles well inside this; past it
+# the graph is not going to evaluate and waiting longer will not help.
+# 3 attempts: each retry re-reads the statement ids, and in observed runs a single
+# retry was always enough. The third exists only so one unlucky run is not fatal.
+TITLE_SETTLE_TIMEOUT_S = 30.0
+TITLE_ATTEMPTS = 3
+# 1.5s between polls: fast enough that the common case adds no noticeable delay,
+# slow enough not to hammer the endpoint through a 30s wait.
+POLL_INTERVAL_S = 1.5
+
+
 def apply_mdx_statement_titles(workspace_id: str, page_id: str, mdx: str,
-                               settle_timeout_s: float = 30.0,
-                               attempts: int = 3) -> dict:
+                               settle_timeout_s: float = TITLE_SETTLE_TIMEOUT_S,
+                               attempts: int = TITLE_ATTEMPTS) -> dict:
     """Set statement titles from the `name` attributes in the MDX that built the page.
 
     insert_mdx_content leaves every statement titled "Untitled Statement": the MDX
@@ -405,7 +421,7 @@ def apply_mdx_statement_titles(workspace_id: str, page_id: str, mdx: str,
         deadline = time.monotonic() + timeout_s
         c = get_page_context(workspace_id, page_id)
         while time.monotonic() < deadline and not evaluated(c):
-            time.sleep(1.5)
+            time.sleep(POLL_INTERVAL_S)
             c = get_page_context(workspace_id, page_id)
         return c
 
@@ -453,7 +469,7 @@ def apply_mdx_statement_titles(workspace_id: str, page_id: str, mdx: str,
                        if (by_id.get(sid) or {}).get("title") != want]
             if not pending or time.monotonic() >= deadline:
                 break
-            time.sleep(1.5)
+            time.sleep(POLL_INTERVAL_S)
 
         untitled_left = sum(
             1 for st in after["statements"]
