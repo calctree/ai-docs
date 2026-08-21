@@ -4,59 +4,39 @@ The repo was made private on 2026-07-30 pending this cleanup. It was previously 
 Context7-indexed. Nothing below blocks internal use: the workarounds are documented in
 `SKILL.md` and we keep building against them.
 
-## Blocker 1: `x-api-key` silently drops formula statements
+## Blocker 1: `x-api-key` silently drops formula statements — RESOLVED 2026-08-21
 
-**Fix server-side. Do not ship this as permanent public guidance.**
+**Fixed server-side by the tech team (calc-service auth token). Verified live.**
 
-Under `Authorization: Bearer <jwt>`, a content write creates the body node and the
-calculation statement together. Under `x-api-key`, the body node lands, the calculation
-service rejects the forwarded key, and the statement never persists. The caller gets a 200
-and a page that looks correct with empty calculation blocks. No error surfaces.
+The calc service now accepts the forwarded API key, so a single `x-api-key` covers every call
+in the skill. Verified 2026-08-21 with no Bearer token anywhere, on each write path the skill
+documents:
 
-Why it matters for a public repo: an API key is the credential we would hand to an external
-integrator, and it is the one that produces silently broken pages. Publishing "use Bearer,
-never the API key" tells the world that our documented authentication path does not work for
-the main write. The honest fix is for the calculation service to accept the forwarded API
-key, or for the gateway to exchange it for a service token before forwarding.
+| Path | Result |
+|---|---|
+| `<Assignment>` via `insertMDXContent` | statement persisted and evaluated |
+| `<EquationBlock>` via `insertMDXContent` | `M_max = 360 kN*m` server-side |
+| `<Python>` via `insertMDXContent` | `ct.quantity` / `.to()` / `.magnitude` all ran, zero errors |
+| `createOrUpdateCalculation` direct | `moment_c = 36 kN*m`, title preserved |
 
-### The workaround in effect, and what it costs
+Consequences, all applied:
 
-Every internal flow now mints a **Bearer token by logging in with an account email and
-password held in env**: the harness via `scripts/auth.ts`, and the calctree-ops GraphQL proxy
-via `server/routes/calctree.ts`. It works, and it stays until the platform fix lands, because
-it is what unblocks template building.
+- The login-minted Bearer path is **deleted**: `scripts/auth.ts` is gone, `authHeaders()` is
+  API-key only, and `CALCTREE_LOGIN_EMAIL` / `CALCTREE_LOGIN_PASSWORD` / `CALCTREE_BEARER` are
+  out of the ops env. Section 1 of `SKILL.md` now presents the API key as the normal path.
+- The four costs listed against the password workaround (scope, revocation, audit, least
+  privilege) no longer apply to this repo.
+- Still to do in calctree-ops: `server/routes/calctree.ts` still mints a Bearer for
+  `insertMDXContent` / `createOrUpdateCalculation` via `BEARER_ONLY_MUTATIONS`, and
+  `server/lib/env.ts` still reads `CALCTREE_REPORT_EMAIL` / `_PASSWORD` to do it. That path is
+  now redundant and should be cut, which is what keeps the account password in the ops env.
+  The Playwright figure capture in `docs/content/wind-optioneering-lp/shoot.ts` genuinely needs
+  a browser login, so those two vars stay until that flow changes.
 
-**It is a deliberately temporary shape, and worse than an API key on four counts:**
-
-1. **Scope.** An API key is issued for API access. A password is the credential for the whole
-   account: it works in the web UI and can change account settings.
-2. **Revocation.** Rotating a key is targeted. Rotating a password invalidates every session
-   that account has, and breaks anything else using it, which includes the Playwright
-   report-printing flow.
-3. **Audit.** Writes appear as that account rather than as a service identity, so "the ops app
-   did this" is indistinguishable from a person doing it in the browser.
-4. **Least privilege.** A key can be scoped later. A password cannot be scoped at all.
-
-Nothing about this is a design choice. It exists only because the API key does not work for
-content writes.
-
-**Narrowing steps. The first is DONE as of 2026-07-30:**
-
-- **DONE.** The ops proxy sends Bearer only for `insertMDXContent` and
-  `createOrUpdateCalculation`; everything else goes on `x-api-key`, so the account credential
-  is off the great majority of traffic. Paired with a tripwire: a write that inserts nodes but
-  creates zero statements is logged as an error, since a narrow allowlist would otherwise fail
-  the same silent way the original bug did.
-- Point ops at the eddie ops account. Note this is **not** only about the password: verified
-  2026-07-30 that `CALCTREE_API_KEY` also resolves to a human account, so api-key writes are
-  already attributed to a person. `CALCTREE_EDDIE_API_KEY` is already present in the ops env,
-  so both the key and the login can move to the service account.
-
-- **Exit condition:** an API key write creates the statement, verified by a live test. Then
-  delete the login paths in `scripts/auth.ts` and `server/routes/calctree.ts`, remove the
-  password from both envs, and rewrite `SKILL.md` section 1 to present the API key as the
-  normal path.
-- **Owner:** platform / tech team. Needs a ticket.
+**New, smaller blocker discovered while verifying:** an invalid or empty API key returns a
+GraphQL `"Unexpected error."` with no 401 and no mention of auth. External users will hit this
+first. Worth a real error message server-side; the skill and `calctree-api.ts` translate it in
+the meantime.
 
 ## Blocker 2: ID format guidance contradicts working practice — SETTLED 2026-08-21
 
@@ -128,6 +108,12 @@ avoided by authoring differently.
 
 The values are unaffected; the cost is presentational, and it is what makes a Python chart node
 read as "Untitled" on a page that is otherwise correct.
+
+**Narrowed 2026-08-21:** `createOrUpdateCalculation` preserves a statement title exactly
+(verified: `'Direct calc write'` round-tripped), while both MDX paths return
+"Untitled Statement". So the calc service handles titles correctly and the gap is in the page
+service, which does not forward the MDX `name` attribute when it constructs the statement.
+That should make this a small fix.
 
 ### The workaround in effect
 

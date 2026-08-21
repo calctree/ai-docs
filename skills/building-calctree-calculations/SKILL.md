@@ -18,8 +18,6 @@ The primitives implement everything below. Prefer running them over re-writing t
 - `scripts/calctree-api.ts` — page creation with tree registration, MDX insert, calculation
   writes, page-context reads, cross-page references. **Read as reference** when you need the
   exact GraphQL shape; **import and call** when driving.
-- `scripts/auth.ts` — `ensureBearer()`. Requires `CALCTREE_LOGIN_EMAIL` and
-  `CALCTREE_LOGIN_PASSWORD`, or a pre-set `CALCTREE_BEARER`.
 - `examples/smoke-two-page.ts` — **run this first** to confirm your credentials and endpoint
   work end to end. It creates two linked pages, reads the computed values back, and prints the
   page URLs:
@@ -30,23 +28,26 @@ The primitives implement everything below. Prefer running them over re-writing t
 
 Requires `tsx` (or any TypeScript-aware runner). No other dependencies.
 
-## 1. Auth: use Bearer, not an API key
+## 1. Auth: one API key
 
-Endpoint: `https://graph.calctree.com/graphql`, header `Authorization: Bearer <jwt>`.
+Endpoint: `https://graph.calctree.com/graphql`, header `x-api-key: <your key>`. That single
+key covers everything in this skill — reads, page creation, content writes, calculation
+writes. Set it as `CALCTREE_API_KEY`.
 
-Mint a token with `POST https://api.calctree.com/api/auth/login` with `{email, password}`,
-which returns `{accessToken}`.
+Verified 2026-08-21 against the live API on every write path here: `insertMDXContent` with
+`<Assignment>`, `<EquationBlock>` and `<Python>` blocks, and `createOrUpdateCalculation`
+directly. All persist their formulas and evaluate server-side under the API key alone.
 
-**Do not use `x-api-key` for content writes.** The API key does not carry through to the
-calculation service, so `insertMDXContent` creates the body node while the statement is
-rejected: you get a page that looks correct with empty calculation blocks and no error.
-Bearer creates the node and the statement together.
+Two things to know:
 
-This is a known platform limitation rather than the intended design. When it is fixed, the API
-key becomes the normal path for every call and this section changes accordingly. Until then, the API key is
-fine for reads and for every other mutation; only `insertMDXContent` and
-`createOrUpdateCalculation` need a login-minted Bearer. Either way, **check the response**: a
-write that returns zero created statements has failed, whatever the HTTP status says.
+- **An invalid or empty key does not announce itself.** A bad key comes back as a GraphQL
+  `"Unexpected error."` on the first mutation, with no 401 and no mention of auth. If you see
+  that, check the key before you debug anything else.
+- **Check the response body, not the HTTP status.** A content write returns
+  `statementsCreated`; if that is zero when you sent formulas, the write failed whatever the
+  status says.
+
+Statements do not need a user id attached. The key identifies the account on its own.
 
 ## 2. The write path
 
