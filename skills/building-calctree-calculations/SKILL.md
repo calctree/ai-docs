@@ -11,22 +11,36 @@ This skill is how an AI agent drives it from outside the platform.
 
 Everything here is verified working against the live API. Treat it as settled.
 
-## Bundled code
+## Bundled files
 
-The primitives implement everything below. Prefer running them over re-writing the calls.
+Three ways to drive this, in order of how little work they are:
 
-- `scripts/calctree-api.ts` — page creation with tree registration, MDX insert, calculation
-  writes, page-context reads, cross-page references. **Read as reference** when you need the
-  exact GraphQL shape; **import and call** when driving.
-- `examples/smoke-two-page.ts` — **run this first** to confirm your credentials and endpoint
-  work end to end. It creates two linked pages, reads the computed values back, and prints the
-  page URLs:
+- **`scripts/calctree_api.py`** — the primitives, standard library only. No pip install, no
+  virtualenv, no Node. Import it, or use it straight from a shell:
 
   ```bash
-  npx tsx examples/smoke-two-page.ts <workspaceId>
+  export CALCTREE_API_KEY=...
+  python3 scripts/calctree_api.py build <workspaceId> "Beam check" page.mdx
+  python3 scripts/calctree_api.py context <workspaceId> <pageId>
   ```
 
-Requires `tsx` (or any TypeScript-aware runner). No other dependencies.
+  `build` runs the whole write path — create page, register it in the tree, insert the MDX,
+  set the statement titles — then reads the computed values back. `python3
+  scripts/calctree_api.py --help` lists the rest (`pages`, `create`, `insert`, `titles`,
+  `reference`, `delete`).
+
+- **`REFERENCE.md`** — every GraphQL document with its variables and response shape. Read this
+  if you cannot run Python, or if you would rather issue the HTTP calls yourself. Nothing here
+  needs our code.
+
+- **`examples/smoke_two_page.py`** — run it first to confirm your key and endpoint work end to
+  end. Creates two linked pages, references one into the other, reads the values back:
+
+  ```bash
+  python3 examples/smoke_two_page.py <workspaceId>
+  ```
+
+  It writes two real pages, so point it at a workspace you do not mind writing to.
 
 ## 1. Auth: one API key
 

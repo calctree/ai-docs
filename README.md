@@ -11,18 +11,38 @@ blocks; the blocks form a **calculation graph** that evaluates server-side with 
 ```
 skills/building-calctree-calculations/
   SKILL.md                    the skill: read this first
-  scripts/calctree-api.ts     pages, MDX content, calculations, page references
-  examples/                   end-to-end example
+  REFERENCE.md                every GraphQL document, for driving it without our code
+  scripts/calctree_api.py     the primitives: stdlib only, importable and a CLI
+  examples/smoke_two_page.py  end-to-end example
+tools/package_skill.py        builds the distributable zip
+.claude-plugin/               Claude Code plugin + marketplace manifests
+AGENTS.md                     entry point for agent tools that look for it
 evals/                        three evaluation scenarios
 llms.txt                      machine-readable index
 ```
+
 
 ## Quick start
 
 ```bash
 export CALCTREE_API_KEY=...
-npx tsx skills/building-calctree-calculations/examples/smoke-two-page.ts <workspaceId>
+python3 skills/building-calctree-calculations/examples/smoke_two_page.py <workspaceId>
 ```
+
+No install: standard library only, no pip, no Node. The smoke test writes two real pages, so
+point it at a workspace you do not mind writing to.
+
+## Installing it
+
+| Surface | How |
+|---|---|
+| Claude Code | `/plugin marketplace add calctree/calctree-skills` then `/plugin install calctree@calctree`, or copy the skill folder into `~/.claude/skills/` |
+| claude.ai, desktop, Cowork | `python3 tools/package_skill.py`, then upload `dist/*.zip` under Settings > Features |
+| Claude API | the same zip via `POST /v1/skills`. Note that surface has no network access, so only the guidance is usable there, not the write path |
+| Cursor, Codex, other agent tools | point them at `AGENTS.md` |
+
+Network access is required for everything except reading the guidance. On claude.ai, Free/Pro/Max
+users toggle it in settings; Team and Enterprise admins allowlist `graph.calctree.com`.
 
 Three things that catch everyone out, all covered in the skill:
 
