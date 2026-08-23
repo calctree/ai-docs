@@ -1,22 +1,23 @@
 # CalcTree
 
-> CalcTree is an engineering calculation platform. A page holds prose plus calculation blocks; the blocks form a calculation graph that evaluates server-side with real units. This repo is the single source of truth for driving CalcTree programmatically from outside the platform.
+> CalcTree turns engineering calculations into API-callable tools. A page is a calculation graph that evaluates server-side with real units. This repo gives your AI the skill to discover pages in a workspace, execute them with custom inputs, and build new ones.
 
-Read the skill first. It is the verified, current account of how to create and read
-calculation pages, and it supersedes any older CalcTree API documentation.
+Read the skill first. It covers the tool-use workflow (discover, introspect, execute) and the page-building path, verified against the live API.
 
 ## Start here
 
-- [CalcTree skill](skills/building-calctree-calculations/SKILL.md): auth, the write path, MDX calculation syntax, formula rules, and the authoring rules that decide whether a generated page reads correctly.
+- [CalcTree skill](skills/building-calctree-calculations/SKILL.md): auth, using pages as tools, the write path, MDX calculation syntax, formula rules, and the authoring rules that decide whether a generated page reads correctly.
 
 ## Working code
 
-- [Primitives](skills/building-calctree-calculations/scripts/calctree_api.py): page creation with tree registration, MDX content insert, calculation writes, page context reads, cross-page references. Standard library only, importable or a CLI.
+- [Primitives](skills/building-calctree-calculations/scripts/calctree_api.py): page listing, page-context reads, simpleCalculate (tool execution), page creation with tree registration, MDX content insert, calculation writes, CSV dataset uploads, cross-page references. Standard library only, importable or a CLI.
 - [GraphQL reference](skills/building-calctree-calculations/REFERENCE.md): every operation with its variables and response shape, for driving the API without running our code.
 - [End-to-end example](skills/building-calctree-calculations/examples/smoke_two_page.py): creates two linked pages and reads the computed values back.
 
 ## Notes
 
-- One `x-api-key` covers reads, page creation and content writes. An invalid key surfaces as a bare `"Unexpected error."`.
+- One `x-api-key` covers reads, page creation, tool execution (`simpleCalculate`) and content writes. An invalid key surfaces as a bare `"Unexpected error."`.
+- To use a page as a tool: `pages` → `context` → `simpleCalculate` with scope overrides.
+- Dataset variables (VLOOKUP) are not in the `simpleCalculate` scope.
 - A page must be registered in the page tree or it is orphaned and invisible.
 - Evaluation is asynchronous: settle about two seconds after a write before reading.

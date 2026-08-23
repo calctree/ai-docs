@@ -1,7 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "CalcTree Skill",
-  "description": "How to drive CalcTree programmatically: create and read engineering calculation pages via the GraphQL API, with MathJS and Python statements and real unit handling",
+  "description": "Turn engineering calculations into AI-callable tools with CalcTree. Discover pages in a workspace, execute them with custom inputs via simpleCalculate, and build new ones. MathJS and Python statements with real unit handling.",
   "folders": [
     "skills"
   ],
@@ -11,28 +11,27 @@
   ],
   "rules": [
     "Read skills/building-calctree-calculations/SKILL.md first, and REFERENCE.md for the exact GraphQL documents: it is verified against the live API and supersedes any older CalcTree documentation",
-    "One 'x-api-key' header covers everything: reads, page creation, insertMDXContent and createOrUpdateCalculation. Verified live 2026-08-21 across <Assignment>, <EquationBlock> and <Python> writes",
+    "To use a CalcTree page as a tool: (1) list_workspace_pages to discover pages, (2) get_page_context to introspect inputs and outputs, (3) simple_calculate with scope overrides to execute with custom inputs",
+    "simple_calculate takes scope: [{name, value}] where values are MathJS-serialised strings like '10 m' or '50 kN / m'. It returns recomputed namedValues for every statement. calculationId equals the page id",
+    "One 'x-api-key' header covers everything: reads, simpleCalculate (tool execution), page creation, insertMDXContent and createOrUpdateCalculation. Verified live 2026-08-21",
     "An invalid or empty API key surfaces as a GraphQL 'Unexpected error.' with no 401 and no mention of auth: check the key before debugging anything else",
+    "Values arrive MathJS-serialised: unit quantities as { mathjs: 'Unit', value: 8, unit: 'm' }, plain numbers, booleans, strings, matrices",
+    "Dataset variables (VLOOKUP) are NOT included in the simpleCalculate scope — they always report 'Undefined symbol' even when the dataset works in the UI",
     "Creating a page takes two steps: create it, then register it in the page tree. A page that exists but is not in the tree is orphaned and invisible",
     "The calculation id equals the page id. Include the page id when creating a calculation or it will not be visible on any page",
-    "Revision ids are KSUIDs. The platform's latest-revision sentinel is '~', which sorts above every base62 character. Verified 2026-08-21 that the public gateway accepts it. Hex-looking values such as 'ffffffff' appear in older documentation but are fragile: a KSUID beginning with a letter after f sorts above them",
-    "Client-minted ids are accepted. Platform-generated ids are 21-character nanoids. Earlier documentation claimed UUIDs are rejected, which is not what working practice shows",
+    "Revision ids are KSUIDs. The platform's latest-revision sentinel is '~', which sorts above every base62 character. Hex-looking values such as 'ffffffff' are fragile: do not use them",
     "Evaluation is asynchronous: settle about two seconds after a write before reading, or a read can return zero statements",
     "Verify calculations by reading the page context (statements with namedValues and errors), never by reading the page back as MDX: MDX round-trips prose but returns calculation blocks empty",
     "Engine types: mathjs (single statement), multiline_mathjs (multiple statements), python, excel, dataset, connection. All statements in a calculation share one scope",
     "MathJS formulas use assignment syntax 'variable = expression'. Put units on inputs ('load = 5 kN'); calculated values inherit them. Unit arithmetic is automatic (1 kPa * 1 m^2 = 1 kN)",
     "Never name a variable after a unit abbreviation (N, V, Pa, M, mm, m, s, kg, K, A, g, h, d, J): a variable named mm shadows the millimetre unit and nulls every later conversion on the page",
-    "Use equalText() for string comparison, not ==, and the word operators and/or/xor/not. Double-quote strings",
     "A pass/fail check must be a named boolean, never a string ternary: 'check = util <= 1 ? \"PASS\" : \"FAIL\"' is always truthy, so a traffic-light chip renders green whatever the result",
-    "Convert for display with 'to' or MathJS auto-rescales (mm^2 becomes ha). round() on a unitful value must strip the unit first: round(X / (1 mm), 3)",
-    "Mentions are display-only: do the rounding in MathJS. A mention of a variable the page never defines renders as the word 'undefined' and no check catches it",
     "Escape < and > as &lt; and &gt; everywhere including prose: a raw one truncates the MDX import from that point on",
-    "MathJS variables with units arrive in Python as ct.quantity() objects already: do not wrap them again. Create new ones with ct.quantity('100 kN'), convert with .to('unit'), and read the number with .magnitude, which is a property and not a method call",
-    "CalcTree uses pint for units in Python, so invalid unit operations raise. Never put an offset unit (degC, degF) in scope on a page with a Python cell: it fails the whole cell with 'Ambiguous operation with offset unit'",
-    "Only use Python libraries pre-installed in the CalcTree environment: see the Python section of the skill",
+    "MathJS variables with units arrive in Python as ct.quantity() objects already: do not wrap them again. Create new ones with ct.quantity('100 kN'), convert with .to('unit'), and read the number with .magnitude (a property, not a method)",
+    "Never put an offset unit (degC, degF) in scope on a page with a Python cell: it fails the whole cell with 'Ambiguous operation with offset unit'",
     "Deleting a page is a soft delete: trashed pages still return from the pages query",
     "In-place content edits cannot remove or reorder body nodes, and leave old statements behind so variables end up defined twice and the page nulls out. To replace content, delete the page and re-create it",
     "Page URLs follow the format https://app.calctree.com/edit/{workspaceId}/{pageId}",
-    "insertMDXContent does not set statement titles, so a third call re-upserts each statement with the SAME statementId plus its title. The ids are not stable straight after the insert: upserting against a stale id is a silent no-op that leaves the page permanently untitled, so read the ids, upsert, then read back and confirm the titles are visible, and retry with fresh ids if they are not"
+    "insertMDXContent does not set statement titles, so a follow-up call re-upserts each statement with the SAME statementId plus its title. The ids are not stable straight after the insert: upserting against a stale id is a silent no-op, so read the ids, upsert, then read back and confirm the titles are visible, and retry with fresh ids if they are not"
   ]
 }

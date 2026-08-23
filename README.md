@@ -1,10 +1,9 @@
 # calctree-skills
 
-The single source of truth for driving [CalcTree](https://www.calctree.com) programmatically:
-the rules an AI agent needs, and the working primitives that implement them.
-
-CalcTree is an engineering calculation platform. A **page** holds prose plus calculation
-blocks; the blocks form a **calculation graph** that evaluates server-side with real units.
+Turn engineering calculations into AI-callable tools with
+[CalcTree](https://www.calctree.com). A CalcTree **page** is a calculation graph that
+evaluates server-side with real units. This repo gives your AI the skill to discover pages
+in a workspace, execute them with custom inputs, and build new ones.
 
 ## Layout
 
@@ -22,15 +21,20 @@ llms.txt                      machine-readable index
 ```
 
 
-## Quick start
+## Quick start: use a page as a tool
 
 ```bash
 export CALCTREE_API_KEY=...
-python3 skills/building-calctree-calculations/examples/smoke_two_page.py <workspaceId>
+python3 skills/building-calctree-calculations/scripts/calctree_api.py pages <workspaceId>
+python3 skills/building-calctree-calculations/scripts/calctree_api.py execute <workspaceId> <pageId> span="10 m"
 ```
 
-No install: standard library only, no pip, no Node. The smoke test writes two real pages, so
-point it at a workspace you do not mind writing to.
+No install: standard library only, no pip, no Node. To verify writes work too, run the
+smoke test (creates two real pages, so point it at a workspace you do not mind writing to):
+
+```bash
+python3 skills/building-calctree-calculations/examples/smoke_two_page.py <workspaceId>
+```
 
 ## Installing it
 
@@ -44,13 +48,15 @@ point it at a workspace you do not mind writing to.
 Network access is required for everything except reading the guidance. On claude.ai, Free/Pro/Max
 users toggle it in settings; Team and Enterprise admins allowlist `graph.calctree.com`.
 
-Three things that catch everyone out, all covered in the skill:
+Four things that catch everyone out, all covered in the skill:
 
-1. **A page must be registered in the page tree.** A page that exists but is not in the tree
+1. **Dataset variables (VLOOKUP) are not in the `simpleCalculate` scope.** Pages that rely
+   on VLOOKUP cannot be fully executed via the tool-use API path.
+2. **A page must be registered in the page tree.** A page that exists but is not in the tree
    is orphaned and invisible.
-2. **Evaluation is asynchronous.** Settle about two seconds after a write before reading, or
+3. **Evaluation is asynchronous.** Settle about two seconds after a write before reading, or
    you may read zero statements.
-3. **An invalid API key does not say so.** It comes back as a GraphQL `"Unexpected error."`
+4. **An invalid API key does not say so.** It comes back as a GraphQL `"Unexpected error."`
    with no 401 and no mention of auth.
 
 ## Testing before this goes public

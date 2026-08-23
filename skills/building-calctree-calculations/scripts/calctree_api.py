@@ -331,6 +331,102 @@ def reference_page_via_api(workspace_id: str, target_page_id: str,
     return {"alias": a, "statementId": statement_id, "count": count}
 
 
+# ---- EXECUTE (run a page's calc graph with custom inputs) ----
+
+def simple_calculate(workspace_id: str, calculation_id: str,
+                     scope: list[dict] | None = None) -> dict:
+    """Execute a page's calculation graph with optional input overrides. This is the
+    read-only "use a page as a tool" call: it evaluates the full graph, substituting
+    any named values you pass in ``scope``, and returns every statement's recomputed
+    ``namedValues`` plus errors/warnings.
+
+    ``calculation_id`` equals the page id. ``scope`` entries are MathJS-serialised:
+    ``[{"name": "span", "value": "10 m"}, {"name": "load", "value": "45 kN / m"}]``.
+
+    NOTE: dataset variables (VLOOKUP) are NOT included in the simpleCalculate scope —
+    they always report "Undefined symbol" even when the dataset works in the UI.
+    """
+    d = gql(
+        """query SimpleCalculate($workspaceId: ID!, $calculationId: ID!, $scope: [ScopeNamedValueInput!]!) {
+             simpleCalculate(workspaceId: $workspaceId, calculationId: $calculationId, scope: $scope) {
+               calculationId
+               statements {
+                 statementId title formula engine
+                 namedValues { name value }
+                 errors warnings
+               }
+               scope {
+                 name value type
+                 artifacts {
+                   ... on ImageArtifact { location bucket type signedUrl }
+                 }
+               }
+             }
+           }""",
+        {"workspaceId": workspace_id, "calculationId": calculation_id,
+         "scope": scope or []},
+    )
+    return d["simpleCalculate"]
+
+
+# ---- CSV DATASET UPLOAD ----
+
+def upload_csv_dataset(workspace_id: str, page_id: str, file_name: str,
+                       csv_content: str) -> str | None:
+    """Upload a CSV dataset to a page via the presigned S3 flow.
+
+    After uploading, wait at least 60 seconds before inserting MDX that uses VLOOKUP
+    against this dataset — the server must process the file first.
+
+    The dataset name comes from the CSV filename (sans ``.csv``). **No leading
+    underscore** in the filename — ``_chain_catalog.csv`` silently produces 0
+    variables; ``chain_catalog.csv`` works.
+
+    Returns the file id on success, or None if the presigned URL could not be obtained.
+    """
+    d = gql(
+        """mutation($w: ID!, $p: ID!, $f: String!, $t: String!){
+             createPresignedUploadPost(workspaceId: $w, pageId: $p, fileName: $f, fileType: $t){
+               presignedPost { url fields } file { id }
+             }
+           }""",
+        {"w": workspace_id, "p": page_id, "f": file_name, "t": "text/csv"},
+    )
+    pp = d.get("createPresignedUploadPost")
+    if not pp:
+        return None
+    presigned = pp["presignedPost"]
+    # Build multipart/form-data manually (stdlib only, no requests)
+    boundary = uuid.uuid4().hex
+    parts: list[bytes] = []
+    for k, v in presigned["fields"].items():
+        parts.append(
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{k}"\r\n\r\n'
+            f"{v}\r\n".encode()
+        )
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{file_name}"\r\n'
+        f"Content-Type: text/csv\r\n\r\n".encode()
+        + csv_content.encode("utf-8")
+        + b"\r\n"
+    )
+    parts.append(f"--{boundary}--\r\n".encode())
+    body = b"".join(parts)
+    req = urllib.request.Request(
+        presigned["url"], data=body, method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=GQL_TIMEOUT_S) as res:
+            pass  # 200 or 204 is success
+    except urllib.error.HTTPError as e:
+        if e.code not in (200, 204):
+            raise CalcTreeError(f"CSV upload failed: HTTP {e.code}") from None
+    return pp["file"]["id"]
+
+
 # ---- STATEMENT TITLES ----
 
 TITLED_COMPONENTS = (
@@ -555,10 +651,12 @@ USAGE = """usage: python3 calctree_api.py <command> [args]
 
   pages       <workspaceId>
   context     <workspaceId> <pageId>
+  execute     <workspaceId> <pageId> [name=value ...]   run a page with custom inputs
   create      <workspaceId> <title> [parentId]
   insert      <workspaceId> <pageId> <file.mdx|->
   titles      <workspaceId> <pageId> <file.mdx|->
   build       <workspaceId> <title> <file.mdx|->     create + insert + titles + read back
+  upload-csv  <workspaceId> <pageId> <file.csv>      upload a CSV dataset
   reference   <workspaceId> <targetPageId> <sourcePageId> [alias]
   audit       <workspaceId> <pageId>... | -   report statements left "Untitled Statement"
   delete      <workspaceId> <pageId>                 soft delete
@@ -584,6 +682,16 @@ def main(argv: list[str]) -> int:
             print(f"page: {(ctx.get('page') or {}).get('title')!r}")
             print(f"{len(ctx['statements'])} statement(s)")
             _print_statements(ctx["statements"])
+        elif cmd == "execute":
+            scope = []
+            for pair in args[2:]:
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    scope.append({"name": k, "value": v})
+            r = simple_calculate(args[0], args[1], scope)
+            print(f"calculationId: {r['calculationId']}")
+            print(f"{len(r['statements'])} statement(s)")
+            _print_statements(r["statements"])
         elif cmd == "create":
             page = create_page_in_tree(args[0], args[1], args[2] if len(args) > 2 else None)
             print(f"{page['id']}\n{page_url(args[0], page['id'])}")
@@ -611,6 +719,15 @@ def main(argv: list[str]) -> int:
                 print("WARNING: titles were not confirmed on the page", file=sys.stderr)
             _print_statements(r["statements"])
             print(r["url"])
+        elif cmd == "upload-csv":
+            csv_data = open(args[2], encoding="utf-8").read()
+            fid = upload_csv_dataset(args[0], args[1], os.path.basename(args[2]), csv_data)
+            if fid:
+                print(f"uploaded: fileId={fid}")
+                print("wait at least 60s before inserting MDX that uses VLOOKUP against this dataset")
+            else:
+                print("upload failed: no presigned URL returned", file=sys.stderr)
+                return 1
         elif cmd == "reference":
             r = reference_page_via_api(args[0], args[1], args[2],
                                        args[3] if len(args) > 3 else None)

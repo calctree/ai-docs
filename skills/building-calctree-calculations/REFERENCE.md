@@ -16,6 +16,7 @@ the key before debugging anything else.
 
 ## Contents
 
+- Execute: `simpleCalculate`
 - The write path, in order
 - Ids
 - Reads: `pages`, `page` + `pageContent`, `calculation`, `pageMDX`
@@ -23,6 +24,46 @@ the key before debugging anything else.
 - Statement titles, and the two traps
 - Cross-page references
 - In-place edits
+
+## Execute: simpleCalculate
+
+Run a page's calculation graph with optional input overrides. Read-only — does not
+modify the page.
+
+```graphql
+query SimpleCalculate($workspaceId: ID!, $calculationId: ID!, $scope: [ScopeNamedValueInput!]!) {
+  simpleCalculate(workspaceId: $workspaceId, calculationId: $calculationId, scope: $scope) {
+    calculationId
+    statements {
+      statementId title formula engine
+      namedValues { name value }
+      errors warnings
+    }
+    scope {
+      name value type
+      artifacts {
+        ... on ImageArtifact { location bucket type signedUrl }
+      }
+    }
+  }
+}
+```
+
+```json
+{"workspaceId": "<ws>", "calculationId": "<pageId>",
+ "scope": [{"name": "span", "value": "10 m"}, {"name": "load", "value": "50 kN / m"}]}
+```
+
+`calculationId` equals the page id. `scope` entries are MathJS-serialised strings.
+
+The response `statements` array contains every statement with its recomputed
+`namedValues`. The `scope` array has every resolved variable with its `type` and any
+`artifacts` (e.g. plot images).
+
+**Limitations:**
+- Dataset variables (VLOOKUP) are **not** in the scope — they always report
+  "Undefined symbol" even when the dataset works in the UI.
+- Python statement outputs may not appear in the simplified scope.
 
 ## The write path, in order
 
