@@ -58,17 +58,40 @@ and how to interpret the results.
   python3 examples/smoke_two_page.py <workspaceId>
   ```
 
-## 1. Auth: one API key
+## 1. Auth and environment setup
 
 Endpoint: `https://graph.calctree.com/graphql`, header `x-api-key: <your key>`. That single
 key covers everything in this skill — reads, page creation, content writes, calculation
-writes. Set it as `CALCTREE_API_KEY`.
+writes.
 
-Verified 2026-08-21 against the live API on every write path here: `insertMDXContent` with
-`<Assignment>`, `<EquationBlock>` and `<Python>` blocks, and `createOrUpdateCalculation`
-directly. All persist their formulas and evaluate server-side under the API key alone.
+### Network access is required
 
-Two things to know:
+This skill makes live HTTP calls to `graph.calctree.com` (and `api.calctree.com` for dataset
+uploads). If you are running in a sandboxed environment, **network access must be enabled
+before any API call will work.** Without it, every call will fail silently or timeout.
+
+| Surface | How to enable network access |
+|---|---|
+| **Claude Code** | Already has network access — no action needed |
+| **claude.ai / Claude desktop** | Settings > Features > toggle **"Allow network"** on. Team and Enterprise admins: allowlist `graph.calctree.com` and `api.calctree.com` |
+| **Claude API** | The API sandbox has **no** network access. The skill guidance is readable but API calls cannot be made from this surface |
+| **Other LLMs (ChatGPT, Cursor, etc.)** | Depends on the platform. If the LLM has code execution with network access, it works. If not, give the user the GraphQL queries from REFERENCE.md to run themselves |
+
+### Providing the API key
+
+The API key must be available as `CALCTREE_API_KEY` or passed directly in the
+`x-api-key` header. How to provide it depends on the surface:
+
+| Surface | How to provide the key |
+|---|---|
+| **Claude Code** | `export CALCTREE_API_KEY=...` in your shell before starting, or set it in your project's `.env` |
+| **claude.ai / Claude desktop** | Include it in your prompt: "My CalcTree API key is ..." — the sandbox cannot read your shell environment |
+| **Other LLMs** | Same as Claude desktop — paste it in the prompt or attach it as a file. The LLM needs it to set the `x-api-key` header |
+
+If you do not have a key, ask the user to provide one. Keys are generated in the CalcTree
+app under workspace settings.
+
+### Gotchas
 
 - **An invalid or empty key does not announce itself.** A bad key comes back as a GraphQL
   `"Unexpected error."` on the first mutation, with no 401 and no mention of auth. If you see
