@@ -116,9 +116,10 @@ them up separately.
 
 ### Gotchas
 
-- **An invalid or empty key does not announce itself.** A bad key comes back as a GraphQL
-  `"Unexpected error."` on the first mutation, with no 401 and no mention of auth. If you see
-  that, check the key before you debug anything else.
+- **An invalid key returns a clear 401** (`"Auth failed: 401 : Unauthorized"` with
+  `extensions.code: UNAUTHENTICATED`). A **missing** `x-api-key` header, however, comes back
+  as a generic `"Unexpected error."` with no 401 and no mention of auth. If you see
+  `"Unexpected error."`, check the header is being sent before you debug anything else.
 - **Check the response body, not the HTTP status.** A content write returns
   `statementsCreated`; if that is zero when you sent formulas, the write failed whatever the
   status says.
@@ -141,8 +142,11 @@ query($workspaceId: ID!) {
 }
 ```
 
-This returns every page in the workspace. Soft-deleted pages are included (the platform
-does not hard-delete), so filter by title if you need only live pages.
+This returns every page in the workspace. Soft-deleted (trashed) pages are included — the
+platform does not hard-delete — so a busy workspace may have duplicate titles from test
+runs. When matching by title, prefer the most recently modified copy, or ask the user to
+confirm if there are duplicates. If the user provides a page URL or ID, use that directly
+rather than searching by title.
 
 If `calctree_api.py` is available: `python3 calctree_api.py pages <workspaceId>`
 
