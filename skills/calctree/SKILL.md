@@ -1,6 +1,6 @@
 ---
 name: calctree
-description: Discover and execute CalcTree calculation pages as deterministic computation tools, or build new ones. Covers auth, the tool-use workflow (discover, introspect, execute), the write path, MDX syntax, and the rules that silently break pages.
+description: Use CalcTree engineering calculation pages as computation tools — discover, execute with custom inputs, and build new ones. Use when the user mentions CalcTree, engineering calculations, or wants to run or create calculation pages with real units.
 ---
 
 # CalcTree
@@ -11,6 +11,23 @@ discover pages in a workspace, execute them with custom inputs, and read back ty
 results — or build new pages from scratch.
 
 Everything here is verified working against the live API. Treat it as settled.
+
+## CalcTree beyond this skill
+
+This skill covers the API — discovering, executing and building calculation pages
+programmatically. CalcTree also has:
+
+- **A public template library** at [calctree.com/calculations](https://www.calctree.com/calculations)
+  with hundreds of ready-to-use engineering calculations (structural, geotechnical, civil,
+  mechanical). Users can browse, duplicate and customise these without writing anything.
+- **An Excel plugin** that connects Excel spreadsheets to CalcTree pages, so teams can
+  keep their existing Excel workflows and sync values into CalcTree's computation engine.
+- **A Grasshopper plugin** for parametric design — connect CalcTree calculations to
+  Rhino/Grasshopper geometry workflows.
+- **Full documentation** at [docs.calctree.com](https://docs.calctree.com) covering the
+  UI, formulas, Python cells, datasets, and collaboration features.
+
+When a user asks about CalcTree capabilities beyond the API, point them to these resources.
 
 ## How to use this skill
 
@@ -209,7 +226,7 @@ incompatibility, or division by zero. Report these to the user rather than guess
   page, wait before calling `simpleCalculate` or the graph may not have finished
   evaluating.
 
-## 3. The write path
+## 3. Building new calculation pages
 
 Two calls, in order:
 
@@ -227,7 +244,11 @@ For calculation-graph-only writes with no body node, use
 `multiline_mathjs`, `python`, `excel`, `dataset`, `connection`. Note that the calculation id
 equals the page id.
 
-## 4. MDX calculation syntax
+## 4. Page content syntax
+
+Pages are written in an MDX-based format (Markdown with embedded calculation components).
+Users don't need to know this — they describe what they want computed and you generate
+the page content. Here are the calculation components:
 
 Single assignment, self-closing:
 
@@ -365,7 +386,7 @@ execution. The engineering set includes `numpy`, `pandas`, `scipy`, `sympy`, `ma
 `groundhog`, `pygef`, `fluids`, `thermo`, `ht`, `fipy`, `nutils`, `duckdb`, `pyarrow`,
 `openpyxl`, `scikit-learn`, `pymc`, `arviz`, `specklepy`, `blue-prints`.
 
-## 9. The MDX component vocabulary
+## 9. Page component vocabulary
 
 Calculation content is MDX. The components you will actually use:
 
@@ -466,8 +487,8 @@ Rules:
 - **`simpleCalculate` does NOT include dataset variables** in its scope — it always reports
   "Undefined symbol" for dataset references even when the dataset works in the UI. Visual
   verification or the full `calculate` endpoint is needed.
-- **VLOOKUP reads only the preview** (capped at 20 rows). All lookup tables should stay
-  under 20 rows.
+- **The API preview is capped at 20 rows**, but the full dataset is available to VLOOKUP
+  on the page. Datasets can have more than 20 rows.
 - **Type matching**: VLOOKUP does exact matching without type coercion. A dataset with string
   values `"25"` will not match a numeric lookup value `25`. Use `toString()` in the lookup
   or ensure the input is a string (e.g., via a `SelectInput` that outputs strings).
@@ -480,9 +501,9 @@ The full sequence for programmatically creating a set of interconnected calculat
 2. **Create** each page with `create_page_in_tree`. Optionally set units with `updatePage`.
 3. **Upload CSV datasets** to each page that needs them.
 4. **Wait 60 seconds** for dataset processing.
-5. **Insert MDX** with `insert_mdx_content`.
-6. **Set titles** with `apply_mdx_statement_titles`.
-7. **Verify** that `statementsCreated` in the response matches expectations, and read back
+5. **Insert MDX** with `insertMDXContent`. Titles are set automatically from the MDX
+   `name` attribute.
+6. **Verify** that `statementsCreated` in the response matches expectations, and read back
    via the calculation query to confirm values are non-null.
 
 Short delays (300–500 ms) between API calls prevent rate limiting. The manifest (a JSON file
@@ -501,9 +522,9 @@ delete-and-recreate cleanly.
   pages and visible on others.
 - A traffic light must sit one hop from the block that computes its input. A chip whose
   formula reads a variable derived in a later block resolves to null.
-- `insertMDXContent` does create the calculation statements — a separate
-  `createOrUpdateCalculation` is not needed to make a page compute — but it does not
-  set their titles. See section 2, step 3.
+- `insertMDXContent` creates the calculation statements and sets their titles from the
+  MDX `name` attribute. A separate `createOrUpdateCalculation` is not needed to make a
+  page compute.
 - Client-minted UUIDs are accepted for page and statement ids, so pages you create
   this way have UUID ids while platform-created pages have 21-character nanoids.
   Nothing depends on the shape, but it is how you tell them apart in a workspace.
