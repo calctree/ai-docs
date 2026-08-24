@@ -321,11 +321,11 @@ Same engine as the in-app editor:
 - `equalText()` for string comparison, not `==`. Word operators: `and`, `or`, `xor`, `not`.
 - Double-quote strings.
 - **CalcTree is unit-aware**: values carry real physical units through every calculation, and
-  unit conversions happen automatically. This means the engine knows tokens like `N`, `mm`,
-  `m`, `kg`, `Pa`, `kN`, `t`, `h`, `d`, `s`, `K`, `A`, `g`, `J`, `L`, `W`, `T`, `C`, `F`,
-  `min` as units. If you name a variable the same as a unit token, it overrides that unit for
-  the rest of the page — so use descriptive names: `M_max` not `M`, `t_days` not `t`,
-  `h_sec` not `h`, `d_eff` not `d`.
+  unit conversions happen automatically. You can name a variable after a unit token and it
+  works naturally — `m = 4 m` defines a variable `m` with value 4 metres, and `y = 4 * m`
+  gives `16 m`. The variable overrides the token but the unit is preserved from the
+  assignment. That said, descriptive names are clearer for readers: `M_max` rather than `M`,
+  `t_creep` rather than `t`.
 - **`phi`, `e`, `i`, `pi` and `tau` are built-in MathJS constants** — `phi` is the golden
   ratio, not a free name. Use `phi_creep` for a creep coefficient, `phi_bar` for a bar
   diameter.
