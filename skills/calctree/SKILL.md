@@ -98,6 +98,22 @@ The API key must be available as `CALCTREE_API_KEY` or passed directly in the
 If you do not have a key, ask the user to provide one. Keys are generated in the CalcTree
 app under workspace settings.
 
+### Finding workspace and page IDs
+
+Both IDs are in the CalcTree URL:
+
+```
+https://app.calctree.com/home/<workspaceId>
+https://app.calctree.com/edit/<workspaceId>/<pageId>
+```
+
+For example, in `https://app.calctree.com/edit/91741894-82cd-4ec7-a8a9-2cc408a024dd/0LgJ9wB8yto_KnvtiNX2Y`:
+- Workspace ID: `91741894-82cd-4ec7-a8a9-2cc408a024dd` (UUID)
+- Page ID (also the calculation ID): `0LgJ9wB8yto_KnvtiNX2Y` (nanoid)
+
+If a user shares a CalcTree URL, extract the IDs from it rather than asking them to look
+them up separately.
+
 ### Gotchas
 
 - **An invalid or empty key does not announce itself.** A bad key comes back as a GraphQL
