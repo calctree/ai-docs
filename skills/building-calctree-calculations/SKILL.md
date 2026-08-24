@@ -12,12 +12,20 @@ results — or build new pages from scratch.
 
 Everything here is verified working against the live API. Treat it as settled.
 
-## Bundled files
+## How to use this skill
 
-Three ways to drive this, in order of how little work they are:
+Everything in this skill can be driven with plain HTTP calls — no Python, no Node, no
+dependencies. The API is a single GraphQL endpoint. This skill tells you what to call
+and how to interpret the results.
 
-- **`scripts/calctree_api.py`** — the primitives, standard library only. No pip install, no
-  virtualenv, no Node. Import it, or use it straight from a shell:
+**Bundled files:**
+
+- **`REFERENCE.md`** — every GraphQL document with its variables and response shape. This
+  is all you need to drive the API from any language or HTTP client.
+
+- **`scripts/calctree_api.py`** *(optional)* — a convenience wrapper around the same
+  GraphQL calls, standard library only. Useful when you have Python + network access, but
+  not required. The skill works identically without it.
 
   ```bash
   export CALCTREE_API_KEY=...
@@ -26,23 +34,12 @@ Three ways to drive this, in order of how little work they are:
   python3 scripts/calctree_api.py context <workspaceId> <pageId>
   ```
 
-  `execute` runs a page with custom inputs and prints the results. `build` runs the whole
-  write path — create, insert MDX, set titles — then reads back. `python3
-  scripts/calctree_api.py --help` lists the rest (`pages`, `create`, `insert`, `titles`,
-  `upload-csv`, `reference`, `delete`).
-
-- **`REFERENCE.md`** — every GraphQL document with its variables and response shape. Read this
-  if you cannot run Python, or if you would rather issue the HTTP calls yourself. Nothing here
-  needs our code.
-
-- **`examples/smoke_two_page.py`** — run it first to confirm your key and endpoint work end to
-  end. Creates two linked pages, references one into the other, reads the values back:
+- **`examples/smoke_two_page.py`** *(optional)* — end-to-end test that creates two linked
+  pages. Run it to confirm your key and endpoint work:
 
   ```bash
   python3 examples/smoke_two_page.py <workspaceId>
   ```
-
-  It writes two real pages, so point it at a workspace you do not mind writing to.
 
 ## 1. Auth: one API key
 
@@ -73,31 +70,40 @@ your inputs.
 
 ### Discover pages in a workspace
 
-```python
-from calctree_api import list_workspace_pages
+Query the GraphQL endpoint to list all pages:
 
-pages = list_workspace_pages(workspace_id)
-# → [{"id": "abc123", "title": "Simply Supported Beam"}, ...]
+```graphql
+query($workspaceId: ID!) {
+  pages(workspaceId: $workspaceId) { id title }
+}
 ```
-
-Or from a shell: `python3 calctree_api.py pages <workspaceId>`
 
 This returns every page in the workspace. Soft-deleted pages are included (the platform
 does not hard-delete), so filter by title if you need only live pages.
+
+If `calctree_api.py` is available: `python3 calctree_api.py pages <workspaceId>`
 
 ### Introspect a page
 
 Read a page's calculation graph to understand what it computes and what inputs it takes:
 
-```python
-from calctree_api import get_page_context
-
-ctx = get_page_context(workspace_id, page_id)
-# ctx["page"]        → {"id": "...", "title": "..."}
-# ctx["statements"]  → [{"statementId", "title", "engine", "formula", "namedValues", "errors"}]
+```graphql
+query($workspaceId: ID!, $calculationId: ID!, $revisionId: ID!) {
+  calculation(workspaceId: $workspaceId, calculationId: $calculationId, revisionId: $revisionId) {
+    statements {
+      statementId title engine formula
+      namedValues { name value }
+      errors
+    }
+  }
+}
 ```
 
-Or from a shell: `python3 calctree_api.py context <workspaceId> <pageId>`
+Variables: `{"workspaceId": "...", "calculationId": "<pageId>", "revisionId": "~"}`
+
+Use `"~"` for `revisionId` — it always means latest. The `calculationId` equals the page id.
+
+If `calctree_api.py` is available: `python3 calctree_api.py context <workspaceId> <pageId>`
 
 Each statement has:
 - `formula` — the MathJS or Python source, showing what variables are defined
@@ -134,18 +140,31 @@ To convert a unit value to a human-readable string: `"360 kN m"` — concatenate
 and returns every statement's recomputed values. It is read-only — it does not modify the
 page.
 
-```python
-from calctree_api import simple_calculate
-
-result = simple_calculate(workspace_id, page_id, [
-    {"name": "span", "value": "10 m"},
-    {"name": "load", "value": "50 kN / m"},
-])
-# result["statements"]  → recomputed statements with namedValues
-# result["scope"]       → full scope with types and artifacts
+```graphql
+query SimpleCalculate($workspaceId: ID!, $calculationId: ID!, $scope: [ScopeNamedValueInput!]!) {
+  simpleCalculate(workspaceId: $workspaceId, calculationId: $calculationId, scope: $scope) {
+    calculationId
+    statements {
+      statementId title formula engine
+      namedValues { name value }
+      errors warnings
+    }
+    scope {
+      name value type
+      artifacts {
+        ... on ImageArtifact { location bucket type signedUrl }
+      }
+    }
+  }
+}
 ```
 
-Or from a shell: `python3 calctree_api.py execute <workspaceId> <pageId> span="10 m" load="50 kN / m"`
+```json
+{"workspaceId": "<ws>", "calculationId": "<pageId>",
+ "scope": [{"name": "span", "value": "10 m"}, {"name": "load", "value": "50 kN / m"}]}
+```
+
+If `calctree_api.py` is available: `python3 calctree_api.py execute <workspaceId> <pageId> span="10 m" load="50 kN / m"`
 
 **Scope format.** Each entry is `{"name": "<variable>", "value": "<mathjs expression>"}`.
 Values are MathJS-serialised strings:
@@ -162,20 +181,13 @@ Note: `calculationId` equals the page id.
 ### Interpreting results
 
 The response `statements` array contains every statement in the page, each with its
-recomputed `namedValues`. Walk the statements and extract the values you need:
+recomputed `namedValues`. Each named value has a `name` and a `value`.
 
-```python
-import json
+`value` arrives **JSON-encoded as a string** and must be parsed. After parsing:
 
-for stmt in result["statements"]:
-    for nv in stmt.get("namedValues") or []:
-        raw = nv.get("value")
-        v = json.loads(raw) if isinstance(raw, str) else raw
-        if isinstance(v, dict) and v.get("mathjs") == "Unit":
-            print(f"{nv['name']} = {v['value']} {v['unit']}")
-        else:
-            print(f"{nv['name']} = {v}")
-```
+- A unit quantity is `{"mathjs": "Unit", "value": 360, "unit": "kN m"}` — read
+  `.value` and `.unit`.
+- A plain number, boolean, or string comes through directly.
 
 The `scope` array in the response contains every resolved variable with its `type`
 (`"number"`, `"Unit"`, `"string"`, `"boolean"`, etc.) and any `artifacts` (e.g. plot
@@ -457,15 +469,14 @@ V_chain = ref_params.V_target * 1 ft/minute
 
 ## 11. Datasets (CSV lookup tables)
 
-Upload a CSV dataset to a page via the presigned upload flow:
+Upload a CSV dataset to a page via the presigned upload flow. This is a two-step process:
 
-```python
-from calctree_api import upload_csv_dataset
+1. Call `createPresignedUploadPost` to get a presigned S3 URL and form fields.
+2. POST the CSV file as `multipart/form-data` to that URL.
 
-file_id = upload_csv_dataset(workspace_id, page_id, "chain_catalog.csv", csv_content)
-```
+See `REFERENCE.md` for the exact GraphQL mutation and upload sequence.
 
-Or from a shell: `python3 calctree_api.py upload-csv <workspaceId> <pageId> chain_catalog.csv`
+If `calctree_api.py` is available: `python3 calctree_api.py upload-csv <workspaceId> <pageId> chain_catalog.csv`
 
 Then **wait at least 60 seconds** before inserting MDX that uses `VLOOKUP` against the
 dataset. The server must process the file first.

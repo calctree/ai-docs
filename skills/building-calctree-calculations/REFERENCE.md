@@ -258,6 +258,34 @@ mutation($workspaceId: ID!, $id: ID!) {
 
 Soft delete.
 
+### createPresignedUploadPost — CSV dataset upload
+
+Two-step process: get a presigned S3 URL, then POST the file to it.
+
+**Step 1: get the presigned URL**
+
+```graphql
+mutation($w: ID!, $p: ID!, $f: String!, $t: String!) {
+  createPresignedUploadPost(workspaceId: $w, pageId: $p, fileName: $f, fileType: $t) {
+    presignedPost { url fields }
+    file { id }
+  }
+}
+```
+
+```json
+{"w": "<workspaceId>", "p": "<pageId>", "f": "chain_catalog.csv", "t": "text/csv"}
+```
+
+**Step 2: POST to S3**
+
+Send a `multipart/form-data` POST to `presignedPost.url`. Include every key-value
+pair from `presignedPost.fields` as form fields, then the file content as a `file`
+field. The S3 response is 200 or 204 with no body.
+
+Wait at least 60 seconds after upload before inserting MDX that uses `VLOOKUP`
+against the dataset.
+
 ## Statement titles
 
 `insertMDXContent` carries the MDX `name` attribute to the document node but not
