@@ -1,46 +1,45 @@
 ---
 name: building-calctree-calculations
-description: Builds and reads CalcTree calculation pages programmatically via the GraphQL API. Use when creating engineering calculations, inserting MDX content with live formulas, reading computed values back, or linking pages together. Covers auth, the write path, MathJS and Python statements, and the rules that silently break pages.
+description: Discover and execute CalcTree calculation pages as deterministic computation tools, or build new ones. Covers auth, the tool-use workflow (discover, introspect, execute), the write path, MDX syntax, and the rules that silently break pages.
 ---
 
 # CalcTree
 
-CalcTree is an engineering calculation platform. A **page** holds prose plus calculation
-blocks; the blocks form a **calculation graph** that evaluates server-side, with real units.
-This skill is how an AI agent drives it from outside the platform.
+CalcTree turns engineering calculations into API-callable tools. A **page** is a
+calculation graph that evaluates server-side with real units. This skill lets your AI
+discover pages in a workspace, execute them with custom inputs, and read back typed
+results — or build new pages from scratch.
 
 Everything here is verified working against the live API. Treat it as settled.
 
-## Bundled files
+## How to use this skill
 
-Three ways to drive this, in order of how little work they are:
+Everything in this skill can be driven with plain HTTP calls — no Python, no Node, no
+dependencies. The API is a single GraphQL endpoint. This skill tells you what to call
+and how to interpret the results.
 
-- **`scripts/calctree_api.py`** — the primitives, standard library only. No pip install, no
-  virtualenv, no Node. Import it, or use it straight from a shell:
+**Bundled files:**
+
+- **`REFERENCE.md`** — every GraphQL document with its variables and response shape. This
+  is all you need to drive the API from any language or HTTP client.
+
+- **`scripts/calctree_api.py`** *(optional)* — a convenience wrapper around the same
+  GraphQL calls, standard library only. Useful when you have Python + network access, but
+  not required. The skill works identically without it.
 
   ```bash
   export CALCTREE_API_KEY=...
+  python3 scripts/calctree_api.py execute <workspaceId> <pageId> span="10 m" load="50 kN / m"
   python3 scripts/calctree_api.py build <workspaceId> "Beam check" page.mdx
   python3 scripts/calctree_api.py context <workspaceId> <pageId>
   ```
 
-  `build` runs the whole write path — create page, register it in the tree, insert the MDX,
-  set the statement titles — then reads the computed values back. `python3
-  scripts/calctree_api.py --help` lists the rest (`pages`, `create`, `insert`, `titles`,
-  `reference`, `delete`).
-
-- **`REFERENCE.md`** — every GraphQL document with its variables and response shape. Read this
-  if you cannot run Python, or if you would rather issue the HTTP calls yourself. Nothing here
-  needs our code.
-
-- **`examples/smoke_two_page.py`** — run it first to confirm your key and endpoint work end to
-  end. Creates two linked pages, references one into the other, reads the values back:
+- **`examples/smoke_two_page.py`** *(optional)* — end-to-end test that creates two linked
+  pages. Run it to confirm your key and endpoint work:
 
   ```bash
   python3 examples/smoke_two_page.py <workspaceId>
   ```
-
-  It writes two real pages, so point it at a workspace you do not mind writing to.
 
 ## 1. Auth: one API key
 
@@ -63,44 +62,164 @@ Two things to know:
 
 Statements do not need a user id attached. The key identifies the account on its own.
 
-## 2. The write path
+## 2. Using pages as computation tools
 
-Three calls, in order:
+This is the core workflow for turning CalcTree pages into AI-callable tools. Three steps:
+discover what pages exist, introspect one to understand its interface, then execute it with
+your inputs.
+
+### Discover pages in a workspace
+
+Query the GraphQL endpoint to list all pages:
+
+```graphql
+query($workspaceId: ID!) {
+  pages(workspaceId: $workspaceId) { id title }
+}
+```
+
+This returns every page in the workspace. Soft-deleted pages are included (the platform
+does not hard-delete), so filter by title if you need only live pages.
+
+If `calctree_api.py` is available: `python3 calctree_api.py pages <workspaceId>`
+
+### Introspect a page
+
+Read a page's calculation graph to understand what it computes and what inputs it takes:
+
+```graphql
+query($workspaceId: ID!, $calculationId: ID!, $revisionId: ID!) {
+  calculation(workspaceId: $workspaceId, calculationId: $calculationId, revisionId: $revisionId) {
+    statements {
+      statementId title engine formula
+      namedValues { name value }
+      errors
+    }
+  }
+}
+```
+
+Variables: `{"workspaceId": "...", "calculationId": "<pageId>", "revisionId": "~"}`
+
+Use `"~"` for `revisionId` — it always means latest. The `calculationId` equals the page id.
+
+If `calctree_api.py` is available: `python3 calctree_api.py context <workspaceId> <pageId>`
+
+Each statement has:
+- `formula` — the MathJS or Python source, showing what variables are defined
+- `namedValues` — the current computed values: `[{"name": "M_max", "value": ...}]`
+- `engine` — `mathjs`, `multiline_mathjs`, `python`, etc.
+- `errors` / `warnings` — any evaluation problems
+
+**Identifying inputs vs outputs.** Look at the formulas:
+- **Inputs** are variables assigned to literal values or wrapped in interactive input
+  components (`SimpleInput`, `SelectInput`). They typically appear early in the calculation.
+  Examples: `span = 8 m`, `load = 45 kN / m`, `f_c = 32 MPa`.
+- **Outputs** are variables computed from other variables. They depend on the inputs.
+  Examples: `M_max = load * span^2 / 8`, `within_limits = util <= 1`.
+
+Any named value can be overridden in the `scope` of `simpleCalculate`, but the meaningful
+ones to override are the inputs.
+
+**Value format.** Values arrive MathJS-serialised:
+
+| Type | Example value |
+|---|---|
+| Unit quantity | `{"mathjs": "Unit", "value": 360, "unit": "kN m"}` |
+| Plain number | `42` |
+| Boolean | `true` |
+| String | `"PASS"` |
+| Matrix | `{"mathjs": "DenseMatrix", "data": [[1,2],[3,4]], "size": [2,2]}` |
+
+To convert a unit value to a human-readable string: `"360 kN m"` — concatenate
+`value` and `unit`.
+
+### Execute with custom inputs
+
+`simpleCalculate` re-evaluates the entire calculation graph with your input overrides
+and returns every statement's recomputed values. It is read-only — it does not modify the
+page.
+
+```graphql
+query SimpleCalculate($workspaceId: ID!, $calculationId: ID!, $scope: [ScopeNamedValueInput!]!) {
+  simpleCalculate(workspaceId: $workspaceId, calculationId: $calculationId, scope: $scope) {
+    calculationId
+    statements {
+      statementId title formula engine
+      namedValues { name value }
+      errors warnings
+    }
+    scope {
+      name value type
+      artifacts {
+        ... on ImageArtifact { location bucket type signedUrl }
+      }
+    }
+  }
+}
+```
+
+```json
+{"workspaceId": "<ws>", "calculationId": "<pageId>",
+ "scope": [{"name": "span", "value": "10 m"}, {"name": "load", "value": "50 kN / m"}]}
+```
+
+If `calctree_api.py` is available: `python3 calctree_api.py execute <workspaceId> <pageId> span="10 m" load="50 kN / m"`
+
+**Scope format.** Each entry is `{"name": "<variable>", "value": "<mathjs expression>"}`.
+Values are MathJS-serialised strings:
+
+| Input type | Scope value |
+|---|---|
+| A length | `"10 m"` |
+| A force per length | `"50 kN / m"` |
+| A plain number | `"42"` or `42` |
+| A string | `"\"Grade 50\""` |
+
+Note: `calculationId` equals the page id.
+
+### Interpreting results
+
+The response `statements` array contains every statement in the page, each with its
+recomputed `namedValues`. Each named value has a `name` and a `value`.
+
+`value` arrives **JSON-encoded as a string** and must be parsed. After parsing:
+
+- A unit quantity is `{"mathjs": "Unit", "value": 360, "unit": "kN m"}` — read
+  `.value` and `.unit`.
+- A plain number, boolean, or string comes through directly.
+
+The `scope` array in the response contains every resolved variable with its `type`
+(`"number"`, `"Unit"`, `"string"`, `"boolean"`, etc.) and any `artifacts` (e.g. plot
+images with `signedUrl`).
+
+**Errors.** If a statement has entries in its `errors` array, that formula failed to
+evaluate. Common causes: undefined variables (the input name was wrong), unit
+incompatibility, or division by zero. Report these to the user rather than guessing.
+
+### Limitations
+
+- **Dataset variables (VLOOKUP) are not included** in the `simpleCalculate` scope. They
+  always report "Undefined symbol" even when the dataset works in the UI. Pages that rely
+  on VLOOKUP cannot be fully executed via `simpleCalculate`.
+- **Python statement outputs may be incomplete** in the `simpleCalculate` response. If
+  results seem missing, fall back to `get_page_context` which reads the stored graph
+  values (though those reflect default inputs, not your overrides).
+- **Settle ~2 seconds after a write before executing.** If you just created or modified a
+  page, wait before calling `simpleCalculate` or the graph may not have finished
+  evaluating.
+
+## 3. The write path
+
+Two calls, in order:
 
 1. **Create the page and register it in the page tree.** Both are required. A page that
    exists but is not in the tree is orphaned and invisible in the UI. Client-minted ids are
    accepted; platform-generated ids are 21-character nanoids.
 2. **`insertMDXContent(workspaceId, pageId, mdx, position)`** returns
    `{insertedCount, statementsCreated}`. Prose and inline calculation blocks both go through
-   here. Always check `statementsCreated` matches what you sent.
-
-3. **`apply_mdx_statement_titles(workspace_id, page_id, mdx)`** — set the statement
-   titles, which step 2 does not do. `insertMDXContent` sends the MDX `name` attribute to the
-   document node but not to the calculation graph, so every statement comes back titled
-   "Untitled Statement". Verified 2026-08-21 against all four naming forms
-   (`<Assignment name>`, `<EquationBlock name formula="...">`, the canonical
-   `<EquationBlock name>` plus fenced block, and `<Python name>`) — every one lost the title,
-   so this is not a quirk of the older attribute form. The values are unaffected; the cost is
-   presentational, and it is what makes a Python chart node read as "Untitled".
-
-   It re-upserts each statement with the **same** `statementId` plus its title, matching
-   statements to MDX blocks by the variables they define rather than by order, because the
-   graph does not come back in document order. Reusing the id updates in place, which matters
-   because this upsert never deletes: a wrong id leaves the old statement live and evaluating
-   beside the new one.
-
-   **This step can silently do nothing, so check that it reports `verified`.** The statement
-   ids returned soon after `insertMDXContent` are not the ids the graph settles on, and
-   upserting against a stale id is a no-op that reports success, changes nothing, and leaves
-   the page permanently untitled. Waiting for `namedValues` to appear is **not** a sufficient
-   guard — verified live on 2026-08-21, two identical builds a minute apart, one titled every
-   statement and the next titled none while reporting success; retrying on the same page
-   worked immediately. So the sequence has to be: read the ids, upsert, **read back and
-   confirm the titles are visible**, and retry with fresh ids if they are not. The bundled
-   function does exactly that and returns `verified` so you can tell success from silence.
-
-   If you are writing your own client rather than using the bundled one, this is the single
-   easiest thing to get wrong, because the failure looks like success.
+   here. Always check `statementsCreated` matches what you sent. Statement titles from the
+   MDX `name` attribute are now set automatically.
 
 For calculation-graph-only writes with no body node, use
 `createOrUpdateCalculation(workspaceId, pageId, statements[])`, where each statement is
@@ -108,7 +227,7 @@ For calculation-graph-only writes with no body node, use
 `multiline_mathjs`, `python`, `excel`, `dataset`, `connection`. Note that the calculation id
 equals the page id.
 
-## 3. MDX calculation syntax
+## 4. MDX calculation syntax
 
 Single assignment, self-closing:
 
@@ -130,7 +249,7 @@ M_max = load * span^2 / 8
 
 No H1 in the body: the page title already renders as the heading.
 
-## 4. Reading back and verifying
+## 5. Reading back and verifying
 
 - **Settle about two seconds after a write before reading.** Evaluation is asynchronous
   server-side, and an immediate read can return zero statements.
@@ -142,7 +261,7 @@ No H1 in the body: the page title already renders as the heading.
   broken. Use the page-context query.
 - Calculations really do evaluate server-side. No browser is needed.
 
-## 5. Formula rules
+## 6. Formula rules
 
 Same engine as the in-app editor:
 
@@ -166,7 +285,7 @@ Same engine as the in-app editor:
 - Within one `multiline_mathjs` formula, define a variable before using it. Across separate
   statements order does not matter: it is a dependency graph.
 
-## 6. Writing pages that read correctly
+## 7. Writing pages that read correctly
 
 The API will happily create a page that computes but presents badly. These are the ones that
 bite:
@@ -203,7 +322,7 @@ bite:
   such value fails the whole cell with "Ambiguous operation with offset unit".
 - Multi-branch categorical results belong in Python plus a table, not a nested ternary.
 
-## 7. Python statements
+## 8. Python statements
 
 A `python` engine statement runs server-side with two globals injected, `ct` and `ctconfig`.
 The full surface, from the engine:
@@ -246,7 +365,7 @@ execution. The engineering set includes `numpy`, `pandas`, `scipy`, `sympy`, `ma
 `groundhog`, `pygef`, `fluids`, `thermo`, `ht`, `fipy`, `nutils`, `duckdb`, `pyarrow`,
 `openpyxl`, `scikit-learn`, `pymc`, `arviz`, `specklepy`, `blue-prints`.
 
-## 8. The MDX component vocabulary
+## 9. The MDX component vocabulary
 
 Calculation content is MDX. The components you will actually use:
 
@@ -261,7 +380,7 @@ Calculation content is MDX. The components you will actually use:
 | `<SimpleInput>`, `<SelectInput>`, `<RadioInput>` | interactive inputs |
 | `<RichTable>` | a table whose cells hold components; plain GFM pipe tables otherwise |
 
-## 9. Linking pages
+## 10. Linking pages
 
 A cross-page reference is a snapshot of the source page's computed values, created as a
 `multiline_mathjs` statement whose object carries a metadata key alongside the values. That
@@ -289,7 +408,88 @@ Two consequences worth planning for:
   factors and recompute the same design values internally. It works, and it means a change to a
   material rule has to be made in as many places as you have checks.
 
-## 10. Gotchas worth knowing before you start
+### Creating cross-page references
+
+There are two ways to create a cross-page reference:
+
+**Via `reference_page_via_api`** (the programmatic path): reads the source page's live values
+and writes a `multiline_mathjs` statement on the target page. Best for scripts that wire
+pages after creation.
+
+**Via MDX EquationBlock** (embedded in the page content during `insertMDXContent`): place the
+import formula directly in an EquationBlock. The formula is the same either way — an object
+literal with a `__ct_meta` key:
+
+```
+<EquationBlock
+  name="Cross-Page Imports"
+  title="Cross-Page Imports"
+  formula='ref_params = { HP_motor: 25, n_chains: 5, __ct_meta: { sourcePageId: "abc123", sourcePageTitle: "Project Parameters", importedAt: "2026-08-19T00:00:00Z" } }'
+/>
+```
+
+Access imported values with dot notation: `HP = ref_params.HP_motor`.
+
+### Imported values and units
+
+Cross-page imported values arrive as **unitless numbers** (or strings/booleans). If the
+source page computes `V_chain = 275 ft/minute`, the import object stores `V_chain: 275`
+without the unit. To restore units on the consuming page, multiply by a unit literal:
+
+```
+V_chain = ref_params.V_target * 1 ft/minute
+```
+
+## 11. Datasets (CSV lookup tables)
+
+Upload a CSV dataset to a page via the presigned upload flow. This is a two-step process:
+
+1. Call `createPresignedUploadPost` to get a presigned S3 URL and form fields.
+2. POST the CSV file as `multipart/form-data` to that URL.
+
+See `REFERENCE.md` for the exact GraphQL mutation and upload sequence.
+
+If `calctree_api.py` is available: `python3 calctree_api.py upload-csv <workspaceId> <pageId> chain_catalog.csv`
+
+Then **wait at least 60 seconds** before inserting MDX that uses `VLOOKUP` against the
+dataset. The server must process the file first.
+
+The dataset name comes from the CSV filename (sans `.csv`). Column indices in VLOOKUP are
+1-based (column 1 is the lookup column).
+
+Rules:
+- **No leading underscore** in the CSV filename — `_chain_catalog.csv` silently produces 0
+  variables; `chain_catalog.csv` works.
+- **Race condition**: if uploading a CSV via API alongside `insertMDXContent`, the 60s wait
+  between the CSV upload and the MDX insertion is load-bearing. Concurrent mutations disrupt
+  the async dataset processing and leave the dataset with 0 variables.
+- **`simpleCalculate` does NOT include dataset variables** in its scope — it always reports
+  "Undefined symbol" for dataset references even when the dataset works in the UI. Visual
+  verification or the full `calculate` endpoint is needed.
+- **VLOOKUP reads only the preview** (capped at 20 rows). All lookup tables should stay
+  under 20 rows.
+- **Type matching**: VLOOKUP does exact matching without type coercion. A dataset with string
+  values `"25"` will not match a numeric lookup value `25`. Use `toString()` in the lookup
+  or ensure the input is a string (e.g., via a `SelectInput` that outputs strings).
+
+## 12. Batch page-creation pipeline
+
+The full sequence for programmatically creating a set of interconnected calculation pages:
+
+1. **Delete** any existing pages (tolerates already-deleted pages).
+2. **Create** each page with `create_page_in_tree`. Optionally set units with `updatePage`.
+3. **Upload CSV datasets** to each page that needs them.
+4. **Wait 60 seconds** for dataset processing.
+5. **Insert MDX** with `insert_mdx_content`.
+6. **Set titles** with `apply_mdx_statement_titles`.
+7. **Verify** that `statementsCreated` in the response matches expectations, and read back
+   via the calculation query to confirm values are non-null.
+
+Short delays (300–500 ms) between API calls prevent rate limiting. The manifest (a JSON file
+mapping slugs to page IDs and URLs) should be updated after each run so re-runs can
+delete-and-recreate cleanly.
+
+## 13. Gotchas worth knowing before you start
 
 - Deleting a page is a **soft** delete. Trashed pages still come back from the pages query
   and accumulate, which slows workspace sync.
