@@ -211,42 +211,15 @@ incompatibility, or division by zero. Report these to the user rather than guess
 
 ## 3. The write path
 
-Three calls, in order:
+Two calls, in order:
 
 1. **Create the page and register it in the page tree.** Both are required. A page that
    exists but is not in the tree is orphaned and invisible in the UI. Client-minted ids are
    accepted; platform-generated ids are 21-character nanoids.
 2. **`insertMDXContent(workspaceId, pageId, mdx, position)`** returns
    `{insertedCount, statementsCreated}`. Prose and inline calculation blocks both go through
-   here. Always check `statementsCreated` matches what you sent.
-
-3. **`apply_mdx_statement_titles(workspace_id, page_id, mdx)`** — set the statement
-   titles, which step 2 does not do. `insertMDXContent` sends the MDX `name` attribute to the
-   document node but not to the calculation graph, so every statement comes back titled
-   "Untitled Statement". Verified 2026-08-21 against all four naming forms
-   (`<Assignment name>`, `<EquationBlock name formula="...">`, the canonical
-   `<EquationBlock name>` plus fenced block, and `<Python name>`) — every one lost the title,
-   so this is not a quirk of the older attribute form. The values are unaffected; the cost is
-   presentational, and it is what makes a Python chart node read as "Untitled".
-
-   It re-upserts each statement with the **same** `statementId` plus its title, matching
-   statements to MDX blocks by the variables they define rather than by order, because the
-   graph does not come back in document order. Reusing the id updates in place, which matters
-   because this upsert never deletes: a wrong id leaves the old statement live and evaluating
-   beside the new one.
-
-   **This step can silently do nothing, so check that it reports `verified`.** The statement
-   ids returned soon after `insertMDXContent` are not the ids the graph settles on, and
-   upserting against a stale id is a no-op that reports success, changes nothing, and leaves
-   the page permanently untitled. Waiting for `namedValues` to appear is **not** a sufficient
-   guard — verified live on 2026-08-21, two identical builds a minute apart, one titled every
-   statement and the next titled none while reporting success; retrying on the same page
-   worked immediately. So the sequence has to be: read the ids, upsert, **read back and
-   confirm the titles are visible**, and retry with fresh ids if they are not. The bundled
-   function does exactly that and returns `verified` so you can tell success from silence.
-
-   If you are writing your own client rather than using the bundled one, this is the single
-   easiest thing to get wrong, because the failure looks like success.
+   here. Always check `statementsCreated` matches what you sent. Statement titles from the
+   MDX `name` attribute are now set automatically.
 
 For calculation-graph-only writes with no body node, use
 `createOrUpdateCalculation(workspaceId, pageId, statements[])`, where each statement is

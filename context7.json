@@ -32,6 +32,6 @@
     "Deleting a page is a soft delete: trashed pages still return from the pages query",
     "In-place content edits cannot remove or reorder body nodes, and leave old statements behind so variables end up defined twice and the page nulls out. To replace content, delete the page and re-create it",
     "Page URLs follow the format https://app.calctree.com/edit/{workspaceId}/{pageId}",
-    "insertMDXContent does not set statement titles, so a follow-up call re-upserts each statement with the SAME statementId plus its title. The ids are not stable straight after the insert: upserting against a stale id is a silent no-op, so read the ids, upsert, then read back and confirm the titles are visible, and retry with fresh ids if they are not"
+    "insertMDXContent now sets statement titles from the MDX name attribute automatically (fixed 2026-08-24). No separate title pass is needed"
   ]
 }

@@ -71,10 +71,8 @@ Creating a page that renders and computes is three calls. All three are required
 
 1. `createPageSync` — makes the page
 2. `addPageNode` — registers it in the page tree, or it is orphaned and invisible
-3. `insertMDXContent` — puts prose and calculation blocks in, and persists the statements
-
-Then, until the platform fixes it, a fourth: `createOrUpdateCalculation` to set the
-statement titles `insertMDXContent` drops. See **Statement titles** below.
+3. `insertMDXContent` — puts prose and calculation blocks in, persists the statements,
+   and sets statement titles from the MDX `name` attribute
 
 ## Ids
 
@@ -288,25 +286,9 @@ against the dataset.
 
 ## Statement titles
 
-`insertMDXContent` carries the MDX `name` attribute to the document node but not
-into the statement it creates, so every statement comes back titled
-`"Untitled Statement"`. Values are unaffected; the cost is presentational.
-
-To fix it, re-upsert each statement with the **same** `statementId` plus its title
-via `createOrUpdateCalculation`.
-
-Two traps, both of which the bundled script handles:
-
-1. **Match statements to MDX blocks by the variables they define, not by order.**
-   The graph does not come back in document order.
-2. **The ids are not stable immediately.** Ids returned soon after
-   `insertMDXContent` are not the ones the graph settles on, and upserting against
-   a stale id is a *silent no-op*: it reports success, changes nothing, and leaves
-   the page permanently untitled. Verified live on 2026-08-21 — two identical
-   builds a minute apart, one titled everything, the next titled nothing and said
-   it had succeeded. Waiting for `namedValues` to appear is not a sufficient guard.
-   Read the ids, upsert, then **read back and confirm the titles are visible**, and
-   retry with fresh ids if they are not.
+`insertMDXContent` now sets statement titles from the MDX `name` attribute
+automatically. No separate `createOrUpdateCalculation` call is needed for titles.
+Verified on prod 2026-08-24.
 
 ## Cross-page references
 

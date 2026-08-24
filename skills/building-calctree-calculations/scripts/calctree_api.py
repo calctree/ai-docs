@@ -215,8 +215,8 @@ def insert_mdx_content(workspace_id: str, page_id: str, mdx: str,
                        position: dict | None = None) -> dict:
     """Prose and calculation blocks both go through here, and the statements DO
     evaluate server-side — a separate create_or_update_calculation is not needed to
-    make a page compute. What it does not do is set statement titles; see
-    apply_mdx_statement_titles.
+    make a page compute. Statement titles from the MDX `name` attribute are now set
+    automatically (fixed on prod 2026-08-24).
 
     Returns {insertedCount, statementsCreated}. ALWAYS check statementsCreated
     against the number of blocks you sent: a write that persisted nothing is a
@@ -485,24 +485,11 @@ POLL_INTERVAL_S = 1.5
 def apply_mdx_statement_titles(workspace_id: str, page_id: str, mdx: str,
                                settle_timeout_s: float = TITLE_SETTLE_TIMEOUT_S,
                                attempts: int = TITLE_ATTEMPTS) -> dict:
-    """Set statement titles from the `name` attributes in the MDX that built the page.
+    """LEGACY: set statement titles from the `name` attributes in the MDX.
 
-    insert_mdx_content leaves every statement titled "Untitled Statement": the MDX
-    `name` reaches the document node but not the calculation graph. This re-upserts
-    each statement with the SAME statementId plus its title, which updates in place.
-    Reusing the id matters — the upsert never deletes, so a wrong id would leave the
-    old statement live and evaluating beside the new one.
-
-    Statements are matched to blocks by which variables they DEFINE, not by order,
-    because the graph does not come back in document order.
-
-    THE RACE, and why this verifies and retries: the statement ids returned soon
-    after insert_mdx_content are not yet the ids the graph settles on. Upserting
-    against a stale id is a SILENT no-op — it reports success, changes nothing, and
-    leaves the page permanently untitled. Waiting for namedValues to appear is not a
-    sufficient guard; observed live on 2026-08-21, one attempt succeeded and the next
-    silently did nothing. So each attempt re-reads the ids, upserts, then confirms the
-    titles are actually visible before reporting success.
+    As of 2026-08-24, insertMDXContent sets titles automatically and this function
+    is no longer needed for new pages. It remains available for repairing pages
+    created before the fix, where statements may still be titled "Untitled Statement".
     """
     blocks = [b for b in parse_mdx_blocks(mdx) if b["assigns"]]
     if not blocks:
@@ -585,8 +572,13 @@ def apply_mdx_statement_titles(workspace_id: str, page_id: str, mdx: str,
 
 def build_page(workspace_id: str, title: str, mdx: str,
                parent_id: str | None = None) -> dict:
-    """create page + register in tree -> insert MDX -> set titles. Returns the page,
-    the insert counts, the title result and the settled statements."""
+    """create page + register in tree -> insert MDX -> read back. Returns the page,
+    the insert counts and the settled statements.
+
+    insertMDXContent now sets statement titles from the MDX name attribute
+    automatically (fixed on prod 2026-08-24), so a separate title pass is no
+    longer needed.
+    """
     page = create_page_in_tree(workspace_id, title, parent_id=parent_id)
     inserted = insert_mdx_content(workspace_id, page["id"], mdx)
     if inserted["statementsCreated"] == 0 and inserted["insertedCount"] > 0:
@@ -594,18 +586,17 @@ def build_page(workspace_id: str, title: str, mdx: str,
             f"insertMDXContent inserted {inserted['insertedCount']} node(s) but created 0 "
             "statements: the page will look correct and not compute"
         )
-    titles = apply_mdx_statement_titles(workspace_id, page["id"], mdx)
+    time.sleep(2)  # settle before reading back
     ctx = get_page_context(workspace_id, page["id"])
-    return {"page": page, "inserted": inserted, "titles": titles,
+    return {"page": page, "inserted": inserted,
             "statements": ctx["statements"], "url": page_url(workspace_id, page["id"])}
 
 
 def audit_untitled(workspace_id: str, page_ids: list[str]) -> dict:
-    """Find pages carrying statements the title pass never set.
+    """Find pages carrying statements still titled "Untitled Statement".
 
-    Worth running over anything pushed before 2026-08-21: the earlier TypeScript
-    client upserted titles without confirming them, so a silent no-op against stale
-    statement ids left pages permanently untitled while reporting success.
+    LEGACY: useful for pages created before 2026-08-24, when insertMDXContent did
+    not set titles. New pages should not need this.
     """
     findings = []
     for pid in page_ids:
@@ -655,7 +646,7 @@ USAGE = """usage: python3 calctree_api.py <command> [args]
   create      <workspaceId> <title> [parentId]
   insert      <workspaceId> <pageId> <file.mdx|->
   titles      <workspaceId> <pageId> <file.mdx|->
-  build       <workspaceId> <title> <file.mdx|->     create + insert + titles + read back
+  build       <workspaceId> <title> <file.mdx|->     create + insert + read back
   upload-csv  <workspaceId> <pageId> <file.csv>      upload a CSV dataset
   reference   <workspaceId> <targetPageId> <sourcePageId> [alias]
   audit       <workspaceId> <pageId>... | -   report statements left "Untitled Statement"
@@ -712,11 +703,6 @@ def main(argv: list[str]) -> int:
             print(f"page {r['page']['id']}")
             print(f"  insertMDXContent: {r['inserted']['insertedCount']} nodes, "
                   f"{r['inserted']['statementsCreated']} statements")
-            t = r["titles"]
-            print(f"  titles: {t['titled']} set, unmatched={t['unmatched']}, "
-                  f"verified={t['verified']}, attempts={t['attempts']}")
-            if not t["verified"]:
-                print("WARNING: titles were not confirmed on the page", file=sys.stderr)
             _print_statements(r["statements"])
             print(r["url"])
         elif cmd == "upload-csv":
