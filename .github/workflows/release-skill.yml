@@ -1,0 +1,44 @@
+name: Release skill zip
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/calctree/**"
+      - "tools/package_skill.py"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build zip
+        run: python tools/package_skill.py --out dist
+
+      - name: Update latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete the existing 'latest' release if it exists, so we can recreate it
+          gh release delete latest --yes 2>/dev/null || true
+          # Delete the tag too — gh release create will recreate it at HEAD
+          git push origin :refs/tags/latest 2>/dev/null || true
+          # Create the new release at HEAD
+          gh release create latest dist/calctree.zip \
+            --title "Latest skill package" \
+            --notes "Auto-built from \`main\`. Download \`calctree.zip\` and upload it under **Settings > Features > Skills** in claude.ai or the Claude desktop app.
+
+See the [docs page](https://docs.calctree.com) for setup instructions.
+
+Built from $(git rev-parse --short HEAD) on $(date -u +%Y-%m-%d)." \
+            --latest
