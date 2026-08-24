@@ -1,5 +1,5 @@
 ---
-name: building-calctree-calculations
+name: calctree
 description: Discover and execute CalcTree calculation pages as deterministic computation tools, or build new ones. Covers auth, the tool-use workflow (discover, introspect, execute), the write path, MDX syntax, and the rules that silently break pages.
 ---
 

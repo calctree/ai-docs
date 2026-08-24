@@ -14,7 +14,7 @@ Verify the API key works before testing anything else — an invalid key returns
 
 ```bash
 export CALCTREE_API_KEY=...
-python3 skills/building-calctree-calculations/scripts/calctree_api.py pages <workspaceId>
+python3 skills/calctree/scripts/calctree_api.py pages <workspaceId>
 ```
 
 ## Creating a test page
@@ -22,7 +22,7 @@ python3 skills/building-calctree-calculations/scripts/calctree_api.py pages <wor
 If you don't have a beam page to point tool-use tests at, create one:
 
 ```bash
-python3 skills/building-calctree-calculations/scripts/calctree_api.py build <workspaceId> "Test beam" -
+python3 skills/calctree/scripts/calctree_api.py build <workspaceId> "Test beam" -
 ```
 
 Then paste this MDX and press Ctrl-D:
@@ -74,7 +74,7 @@ the prompt or set it as a project-level environment variable.
 These can't install the skill, so give them the context directly. Two options:
 
 **Option A: paste SKILL.md as a system prompt.** Copy the contents of
-`skills/building-calctree-calculations/SKILL.md` into the system prompt or as a
+`skills/calctree/SKILL.md` into the system prompt or as a
 file attachment, then paste a test prompt.
 
 **Option B: point at the raw files.** If the LLM has web access, give it the
@@ -82,7 +82,7 @@ raw GitHub URLs:
 
 ```
 Read this CalcTree skill and use it to answer my question:
-https://raw.githubusercontent.com/calctree/calctree-skills/main/skills/building-calctree-calculations/SKILL.md
+https://raw.githubusercontent.com/calctree/calctree-skills/main/skills/calctree/SKILL.md
 
 My API key is: <key>
 My workspace id is: <wsId>
@@ -112,7 +112,7 @@ Six prompts testing discover, introspect, execute, error handling. Replace
 | 5 | Multiple executions | Three separate calls, comparison table |
 | 6 | Error handling — wrong units | Reports the error, doesn't fabricate results |
 
-### `building-calctree-calculations.jsonl` — the write path (existing)
+### `calctree-write-path.jsonl` — the write path (existing)
 
 Three prompts testing page creation, utilisation checks, Python cells. These
 create real pages, so point them at a workspace you don't mind writing to.
@@ -144,7 +144,7 @@ For every test, regardless of model:
 Every write-path test creates real pages. Clean up after:
 
 ```bash
-python3 skills/building-calctree-calculations/scripts/calctree_api.py delete <workspaceId> <pageId>
+python3 skills/calctree/scripts/calctree_api.py delete <workspaceId> <pageId>
 ```
 
 This is a soft delete — pages still show in `pages` queries but are marked as trashed.

@@ -8,7 +8,7 @@ in a workspace, execute them with custom inputs, and build new ones.
 ## Layout
 
 ```
-skills/building-calctree-calculations/
+skills/calctree/
   SKILL.md                    the skill: read this first
   REFERENCE.md                every GraphQL document, for driving it without our code
   scripts/calctree_api.py     the primitives: stdlib only, importable and a CLI
@@ -25,15 +25,15 @@ llms.txt                      machine-readable index
 
 ```bash
 export CALCTREE_API_KEY=...
-python3 skills/building-calctree-calculations/scripts/calctree_api.py pages <workspaceId>
-python3 skills/building-calctree-calculations/scripts/calctree_api.py execute <workspaceId> <pageId> span="10 m"
+python3 skills/calctree/scripts/calctree_api.py pages <workspaceId>
+python3 skills/calctree/scripts/calctree_api.py execute <workspaceId> <pageId> span="10 m"
 ```
 
 No install: standard library only, no pip, no Node. To verify writes work too, run the
 smoke test (creates two real pages, so point it at a workspace you do not mind writing to):
 
 ```bash
-python3 skills/building-calctree-calculations/examples/smoke_two_page.py <workspaceId>
+python3 skills/calctree/examples/smoke_two_page.py <workspaceId>
 ```
 
 ## Installing it
@@ -72,7 +72,7 @@ with no Node, no `pip install`, and no other CalcTree checkout.
 
 ```bash
 export CALCTREE_API_KEY=...
-python3 skills/building-calctree-calculations/examples/smoke_two_page.py <workspaceId>
+python3 skills/calctree/examples/smoke_two_page.py <workspaceId>
 ```
 
 Passes when: two page URLs print, `M_max = 360`, titles report `verified=True`, and page B
@@ -82,8 +82,8 @@ network egress to `graph.calctree.com` and `api.calctree.com`.
 Then the CLI path, which is how an agent with only a shell drives it:
 
 ```bash
-python3 skills/building-calctree-calculations/scripts/calctree_api.py build <workspaceId> "Test" page.mdx
-python3 skills/building-calctree-calculations/scripts/calctree_api.py context <workspaceId> <pageId>
+python3 skills/calctree/scripts/calctree_api.py build <workspaceId> "Test" page.mdx
+python3 skills/calctree/scripts/calctree_api.py context <workspaceId> <pageId>
 ```
 
 ### 2. Install, per surface
@@ -98,7 +98,7 @@ python3 skills/building-calctree-calculations/scripts/calctree_api.py context <w
 
 ### 3. Behaviour
 
-Run the three scenarios in `evals/building-calctree-calculations.jsonl` and judge each against
+Run the three scenarios in `evals/calctree-write-path.jsonl` and judge each against
 its `expected_behavior`. Then check the specific traps that have actually caused bad pages:
 
 - **Statement titles report `verified=True`.** The retry is load-bearing — roughly one run in

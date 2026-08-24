@@ -23,7 +23,7 @@ import sys
 import zipfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_SKILL = "building-calctree-calculations"
+DEFAULT_SKILL = "calctree"
 
 # Only these ship. Anything not listed is internal by default, which is the safe
 # direction for a repo that also holds working notes.
