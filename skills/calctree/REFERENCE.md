@@ -250,7 +250,7 @@ Unlike `insertMDXContent`, this **does** set titles.
 
 ```graphql
 mutation($workspaceId: ID!, $id: ID!) {
-  deletePage(workspaceId: $workspaceId, id: $id) { __typename }
+  deletePage(workspaceId: $workspaceId, id: $id) { id }
 }
 ```
 

@@ -195,7 +195,7 @@ def create_page_in_tree(workspace_id: str, title: str, parent_id: str | None = N
 def delete_page(workspace_id: str, page_id: str) -> None:
     """Soft delete: the page still comes back from list_workspace_pages."""
     gql(
-        "mutation($workspaceId: ID!, $id: ID!){ deletePage(workspaceId: $workspaceId, id: $id){ __typename } }",
+        "mutation($workspaceId: ID!, $id: ID!){ deletePage(workspaceId: $workspaceId, id: $id){ id } }",
         {"workspaceId": workspace_id, "id": page_id},
     )
 
