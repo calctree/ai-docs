@@ -294,6 +294,14 @@ For calculation-graph-only writes with no body node, use
 `multiline_mathjs`, `python`, `excel`, `dataset`, `connection`. Note that the calculation id
 equals the page id.
 
+After creating or modifying a page, always give the user a clickable link in this format:
+
+```
+https://app.calctree.com/edit/<workspaceId>/<pageId>
+```
+
+Do NOT use `/pages/` — that route does not exist. The correct path is `/edit/{workspaceId}/{pageId}`.
+
 ## 4. Page content syntax
 
 Pages are written in an MDX-based format (Markdown with embedded calculation components).
