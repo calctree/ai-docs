@@ -77,10 +77,14 @@ This skill makes live HTTP calls to `graph.calctree.com` (and `api.calctree.com`
 uploads). If you are running in a sandboxed environment, **network access must be enabled
 before any API call will work.** Without it, every call will fail silently or timeout.
 
+PDF report downloads come from S3 (`*.s3.amazonaws.com`). Most sandboxes block this host.
+You do not need to fetch the PDF yourself — give the user the `signedUrl` and they can
+open it in their browser.
+
 | Surface | How to enable network access |
 |---|---|
 | **Claude Code** | Already has network access — no action needed |
-| **claude.ai / Claude desktop** | Settings > Features > toggle **"Allow network"** on. Team and Enterprise admins: allowlist `graph.calctree.com` and `api.calctree.com` |
+| **claude.ai / Claude desktop** | Settings > Features > toggle **"Allow network"** on. Team and Enterprise admins: allowlist `graph.calctree.com`, `api.calctree.com`, and `*.s3.amazonaws.com` (for PDF downloads) |
 | **Claude API** | The API sandbox has **no** network access. The skill guidance is readable but API calls cannot be made from this surface |
 | **Other LLMs (ChatGPT, Cursor, etc.)** | Depends on the platform. If the LLM has code execution with network access, it works. If not, give the user the GraphQL queries from REFERENCE.md to run themselves |
 
@@ -368,8 +372,9 @@ query($workspaceId: ID!, $id: ID!) {
 ```
 
 `reportStatus` transitions: `pending` → `ready` (with `signedUrl`) or `error` (with
-`errorMessage`). Poll every 3–5 seconds. The `signedUrl` is a presigned S3 GET URL —
-give it to the user so they can download the PDF.
+`errorMessage`). Poll every 3–5 seconds. The `signedUrl` is a presigned S3 GET URL.
+Give it to the user as a clickable link — do not try to fetch it yourself, as most
+sandboxes block S3 downloads.
 
 ### Settings reference
 
