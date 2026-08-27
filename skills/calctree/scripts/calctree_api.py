@@ -192,6 +192,60 @@ def create_page_in_tree(workspace_id: str, title: str, parent_id: str | None = N
     return page
 
 
+def create_pdf_report(
+    workspace_id: str,
+    page_ids: list[str],
+    title: str = "Report",
+    file_name: str = "report",
+) -> dict:
+    """Create a PDF report and poll until ready. Returns {id, signedUrl, fileSize}."""
+    import time
+
+    d = gql(
+        """mutation($workspaceId: ID!, $input: CreatePdfReportInput!) {
+          createPdfReport(workspaceId: $workspaceId, input: $input) {
+            id reportStatus
+          }
+        }""",
+        {
+            "workspaceId": workspace_id,
+            "input": {
+                "pageIds": page_ids,
+                "title": title,
+                "fileName": file_name,
+                "settings": {
+                    "paperSize": "A4",
+                    "orientation": "portrait",
+                    "includeTitlePage": True,
+                    "includeTableOfContents": True,
+                    "showPageNumbers": True,
+                    "pageNumberPosition": "bottom-center",
+                },
+                "highlightCalcItems": True,
+                "mathNotation": True,
+                "unitSystem": "si",
+            },
+        },
+    )
+    report_id = d["createPdfReport"]["id"]
+    for _ in range(60):
+        time.sleep(4)
+        q = gql(
+            """query($workspaceId: ID!, $id: ID!) {
+              pdfReport(workspaceId: $workspaceId, id: $id) {
+                reportStatus errorMessage fileSize signedUrl
+              }
+            }""",
+            {"workspaceId": workspace_id, "id": report_id},
+        )
+        r = q["pdfReport"]
+        if r["reportStatus"] == "ready":
+            return {"id": report_id, "signedUrl": r["signedUrl"], "fileSize": r["fileSize"]}
+        if r["reportStatus"] == "error":
+            raise CalcTreeError(f"PDF generation failed: {r['errorMessage']}")
+    raise CalcTreeError("PDF generation timed out after 4 minutes")
+
+
 def delete_page(workspace_id: str, page_id: str) -> None:
     """Soft delete: the page still comes back from list_workspace_pages."""
     gql(
@@ -650,6 +704,7 @@ USAGE = """usage: python3 calctree_api.py <command> [args]
   upload-csv  <workspaceId> <pageId> <file.csv>      upload a CSV dataset
   reference   <workspaceId> <targetPageId> <sourcePageId> [alias]
   audit       <workspaceId> <pageId>... | -   report statements left "Untitled Statement"
+  pdf         <workspaceId> <pageId> [title] [fileName]  generate PDF report
   delete      <workspaceId> <pageId>                 soft delete
 
 '-' reads the MDX from stdin. Requires CALCTREE_API_KEY."""
@@ -729,6 +784,13 @@ def main(argv: list[str]) -> int:
             for f in r["affected"]:
                 print(f"  {f['untitled']}/{f['total']} untitled  {f['title']!r}\n    {f['url']}")
             return 1 if r["affected"] else 0
+        elif cmd == "pdf":
+            title = args[2] if len(args) > 2 else "Report"
+            fname = args[3] if len(args) > 3 else "report"
+            print(f"creating PDF for page {args[1]}...")
+            r = create_pdf_report(args[0], [args[1]], title, fname)
+            print(f"ready ({r['fileSize']} bytes)")
+            print(r["signedUrl"])
         elif cmd == "delete":
             delete_page(args[0], args[1])
             print("deleted (soft)")

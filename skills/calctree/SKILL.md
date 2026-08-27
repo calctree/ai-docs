@@ -302,7 +302,93 @@ https://app.calctree.com/edit/<workspaceId>/<pageId>
 
 Do NOT use `/pages/` — that route does not exist. The correct path is `/edit/{workspaceId}/{pageId}`.
 
-## 4. Page content syntax
+## 4. Generating PDF reports
+
+You can export one or more pages as a formatted PDF report. This uses a server-side print
+service that costs real money per render, so strict limits apply.
+
+**Hard limit: maximum 5 PDF reports per conversation.** Count every `createPdfReport` call.
+If the user asks for more than 5, tell them the limit and suggest they use the in-app
+export for bulk work. Never loop over a page list generating PDFs without explicit user
+confirmation of each batch.
+
+### Creating a PDF
+
+Two-step process: create the job, then poll until it's ready.
+
+**Step 1: create the report**
+
+```graphql
+mutation($workspaceId: ID!, $input: CreatePdfReportInput!) {
+  createPdfReport(workspaceId: $workspaceId, input: $input) {
+    id
+    reportStatus
+  }
+}
+```
+
+The input object:
+
+```json
+{
+  "workspaceId": "<workspaceId>",
+  "input": {
+    "pageIds": ["<pageId>"],
+    "title": "Structural design report",
+    "fileName": "structural-design-report",
+    "settings": {
+      "paperSize": "A4",
+      "orientation": "portrait",
+      "includeTitlePage": true,
+      "includeTableOfContents": true,
+      "showPageNumbers": true,
+      "pageNumberPosition": "bottom-center"
+    },
+    "highlightCalcItems": true,
+    "mathNotation": true,
+    "unitSystem": "si"
+  }
+}
+```
+
+`pageIds` is an array — a single report can combine multiple pages. `reportStatus` will
+be `"pending"` on creation.
+
+**Step 2: poll for completion**
+
+```graphql
+query($workspaceId: ID!, $id: ID!) {
+  pdfReport(workspaceId: $workspaceId, id: $id) {
+    reportStatus
+    errorMessage
+    fileSize
+    signedUrl
+  }
+}
+```
+
+`reportStatus` transitions: `pending` → `ready` (with `signedUrl`) or `error` (with
+`errorMessage`). Poll every 3–5 seconds. The `signedUrl` is a presigned S3 GET URL —
+give it to the user so they can download the PDF.
+
+### Settings reference
+
+| Field | Values | Default |
+|---|---|---|
+| `paperSize` | `"A4"`, `"letter"` | `"A4"` |
+| `orientation` | `"portrait"`, `"landscape"` | `"portrait"` |
+| `includeTitlePage` | boolean | `true` |
+| `includeTableOfContents` | boolean | `true` |
+| `showPageNumbers` | boolean | `true` |
+| `pageNumberPosition` | `"bottom-center"`, `"bottom-right"`, `"bottom-left"` | `"bottom-center"` |
+| `highlightCalcItems` | boolean — highlights calculated values | `true` |
+| `mathNotation` | boolean — renders formulas in math notation | `true` |
+| `unitSystem` | `"si"`, `"imperial"` | `"si"` |
+
+If `calctree_api.py` is available:
+`python3 calctree_api.py pdf <workspaceId> <pageId> [title] [fileName]`
+
+## 5. Page content syntax
 
 Pages are written in an MDX-based format (Markdown with embedded calculation components).
 Users don't need to know this — they describe what they want computed and you generate
@@ -328,7 +414,7 @@ M_max = load * span^2 / 8
 
 No H1 in the body: the page title already renders as the heading.
 
-## 5. Reading back and verifying
+## 6. Reading back and verifying
 
 - **Settle about two seconds after a write before reading.** Evaluation is asynchronous
   server-side, and an immediate read can return zero statements.
@@ -340,7 +426,7 @@ No H1 in the body: the page title already renders as the heading.
   broken. Use the page-context query.
 - Calculations really do evaluate server-side. No browser is needed.
 
-## 6. Formula rules
+## 7. Formula rules
 
 Same engine as the in-app editor:
 
@@ -365,7 +451,7 @@ Same engine as the in-app editor:
 - Within one `multiline_mathjs` formula, define a variable before using it. Across separate
   statements order does not matter: it is a dependency graph.
 
-## 7. Writing pages that read correctly
+## 8. Writing pages that read correctly
 
 The API will happily create a page that computes but presents badly. These are the ones that
 bite:
@@ -402,7 +488,7 @@ bite:
   such value fails the whole cell with "Ambiguous operation with offset unit".
 - Multi-branch categorical results belong in Python plus a table, not a nested ternary.
 
-## 8. Python statements
+## 9. Python statements
 
 A `python` engine statement runs server-side with two globals injected, `ct` and `ctconfig`.
 The full surface, from the engine:
@@ -445,7 +531,7 @@ execution. The engineering set includes `numpy`, `pandas`, `scipy`, `sympy`, `ma
 `groundhog`, `pygef`, `fluids`, `thermo`, `ht`, `fipy`, `nutils`, `duckdb`, `pyarrow`,
 `openpyxl`, `scikit-learn`, `pymc`, `arviz`, `specklepy`, `blue-prints`.
 
-## 9. Page component vocabulary
+## 10. Page component vocabulary
 
 Calculation content is MDX. The components you will actually use:
 
@@ -460,7 +546,7 @@ Calculation content is MDX. The components you will actually use:
 | `<SimpleInput>`, `<SelectInput>`, `<RadioInput>` | interactive inputs |
 | `<RichTable>` | a table whose cells hold components; plain GFM pipe tables otherwise |
 
-## 10. Linking pages
+## 11. Linking pages
 
 A cross-page reference is a snapshot of the source page's computed values, created as a
 `multiline_mathjs` statement whose object carries a metadata key alongside the values. That
@@ -520,7 +606,7 @@ without the unit. To restore units on the consuming page, multiply by a unit lit
 V_chain = ref_params.V_target * 1 ft/minute
 ```
 
-## 11. Datasets (CSV lookup tables)
+## 12. Datasets (CSV lookup tables)
 
 Upload a CSV dataset to a page via the presigned upload flow. This is a two-step process:
 
@@ -552,7 +638,7 @@ Rules:
   values `"25"` will not match a numeric lookup value `25`. Use `toString()` in the lookup
   or ensure the input is a string (e.g., via a `SelectInput` that outputs strings).
 
-## 12. Batch page-creation pipeline
+## 13. Batch page-creation pipeline
 
 The full sequence for programmatically creating a set of interconnected calculation pages:
 
@@ -569,7 +655,7 @@ Short delays (300–500 ms) between API calls prevent rate limiting. The manifes
 mapping slugs to page IDs and URLs) should be updated after each run so re-runs can
 delete-and-recreate cleanly.
 
-## 13. Gotchas worth knowing before you start
+## 14. Gotchas worth knowing before you start
 
 - Deleting a page is a **soft** delete. Trashed pages still come back from the pages query
   and accumulate, which slows workspace sync.

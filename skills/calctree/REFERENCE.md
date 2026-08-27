@@ -246,6 +246,35 @@ back with `"~"`.
 
 Unlike `insertMDXContent`, this **does** set titles.
 
+### createPdfReport
+
+```graphql
+mutation($workspaceId: ID!, $input: CreatePdfReportInput!) {
+  createPdfReport(workspaceId: $workspaceId, input: $input) {
+    id
+    reportStatus
+  }
+}
+```
+
+`reportStatus` is `"pending"` on creation. See SKILL.md § 4 for the full input shape.
+
+### pdfReport
+
+```graphql
+query($workspaceId: ID!, $id: ID!) {
+  pdfReport(workspaceId: $workspaceId, id: $id) {
+    reportStatus
+    errorMessage
+    fileSize
+    signedUrl
+  }
+}
+```
+
+Poll until `reportStatus` is `"ready"` (gives `signedUrl`) or `"error"` (gives
+`errorMessage`). Poll interval: 3–5 seconds.
+
 ### deletePage
 
 ```graphql
