@@ -146,9 +146,13 @@ query($workspaceId: ID!) {
 }
 ```
 
-This returns every page in the workspace. Soft-deleted (trashed) pages are included — the
-platform does not hard-delete — so a busy workspace may have duplicate titles from test
-runs. When matching by title, prefer the most recently modified copy, or ask the user to
+This returns every page in the workspace, **including soft-deleted (trashed) pages** — the
+platform does not hard-delete. A workspace can be 80%+ deleted pages. `pages()` is NOT a
+liveness test. To check if a specific page is actually live, query `page(workspaceId, id)`
+— a `null` return means it's deleted. This matters because `simpleCalculate` and
+`calculation()` work on deleted pages, but `createPdfReport` and the UI do not.
+
+When matching by title, prefer the most recently modified copy, or ask the user to
 confirm if there are duplicates. If the user provides a page URL or ID, use that directly
 rather than searching by title.
 
@@ -372,9 +376,23 @@ query($workspaceId: ID!, $id: ID!) {
 ```
 
 `reportStatus` transitions: `pending` → `ready` (with `signedUrl`) or `error` (with
-`errorMessage`). Poll every 3–5 seconds. The `signedUrl` is a presigned S3 GET URL.
-Give it to the user as a clickable link — do not try to fetch it yourself, as most
-sandboxes block S3 downloads.
+`errorMessage`). Poll every 3–5 seconds — most reports are ready within 5 seconds.
+
+**Always render the download as a clickable markdown link:**
+`[Download <fileName>.pdf](<signedUrl>)` — include the file size. The raw signed URL is
+~1,800 characters and unusable if dumped as plain text. Do not try to fetch the PDF
+yourself — most sandboxes block S3 downloads. Do not claim the PDF rendered correctly
+unless you have actually inspected it.
+
+**Signed URLs expire after 15 minutes.** If a link lapses, re-query `pdfReport` with the
+same id — it mints a fresh `signedUrl` from the same document without regenerating the
+PDF. Never call `createPdfReport` again for a stale link.
+
+**The page must be live.** `createPdfReport` fails with `"Page not found: <id>"` on
+soft-deleted pages, even though `simpleCalculate` and `calculation()` still work on them.
+Before generating a PDF, verify the page exists with `page(workspaceId, id)` — a `null`
+return means it's deleted. Reports outlive their source pages: once generated, the PDF
+remains downloadable even if the page is later deleted.
 
 ### Settings reference
 
