@@ -16,6 +16,7 @@ skills/calctree/
 tools/package_skill.py        builds the distributable zip
 .claude-plugin/               Claude Code plugin + marketplace manifests
 AGENTS.md                     entry point for agent tools that look for it
+CLAUDE.md                     imports AGENTS.md, for Claude Code
 evals/                        three evaluation scenarios
 llms.txt                      machine-readable index
 CONTRIBUTING.md               release testing
@@ -39,12 +40,18 @@ python3 skills/calctree/examples/smoke_two_page.py <workspaceId>
 
 ## Installing it
 
+**⬇ [Download `calctree.zip`](https://github.com/calctree/calctree-skills/releases/latest/download/calctree.zip)** — the packaged skill, rebuilt from `main` on every push. Upload it to
+your assistant and CalcTree becomes an installed skill it can call.
+
 | Surface | How |
 |---|---|
-| Claude Code | `/plugin marketplace add calctree/calctree-skills` then `/plugin install calctree@calctree`, or copy the skill folder into `~/.claude/skills/` |
-| claude.ai, desktop, Cowork | `python3 tools/package_skill.py`, then upload `dist/*.zip` under Settings > Features |
+| claude.ai, desktop, Cowork | Download [`calctree.zip`](https://github.com/calctree/calctree-skills/releases/latest/download/calctree.zip), then upload it under **Settings > Features > Skills** |
+| Claude Code | `/plugin marketplace add calctree/calctree-skills` then `/plugin install calctree@calctree`, or copy `skills/calctree/` into `~/.claude/skills/` |
 | Claude API | the same zip via `POST /v1/skills`. Note that surface has no network access, so only the guidance is usable there, not the write path |
 | Cursor, Codex, other agent tools | point them at `AGENTS.md` |
+
+To build the zip yourself instead, `python3 tools/package_skill.py` writes an identical
+`dist/calctree.zip`.
 
 Network access is required for everything except reading the guidance. On claude.ai, Free/Pro/Max
 users toggle it in settings; Team and Enterprise admins allowlist `graph.calctree.com`.
